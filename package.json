@@ -1,0 +1,13 @@
+{
+  "name": "agent-maker",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev": "bun run --filter @agent-maker/shared dev & bun run --filter @agent-maker/web dev",
+    "dev:web": "bun run --filter @agent-maker/web dev",
+    "dev:convex": "bun run --filter @agent-maker/shared dev",
+    "build": "bun --filter @agent-maker/web build",
+    "typecheck": "bun --filter '*' typecheck"
+  }
+}

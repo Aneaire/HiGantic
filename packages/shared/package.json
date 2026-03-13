@@ -1,0 +1,17 @@
+{
+  "name": "@agent-maker/shared",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bunx convex dev",
+    "deploy": "bunx convex deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "convex": "^1.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^5.8.0"
+  }
+}

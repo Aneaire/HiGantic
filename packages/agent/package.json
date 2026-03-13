@@ -1,0 +1,20 @@
+{
+  "name": "@agent-maker/agent",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/server.ts",
+    "start": "bun src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-code": "^2.1.0",
+    "@agent-maker/shared": "workspace:*",
+    "convex": "^1.21.0",
+    "hono": "^4.7.0",
+    "@hono/node-server": "^1.14.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  }
+}
