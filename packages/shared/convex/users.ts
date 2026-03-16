@@ -44,6 +44,19 @@ export const upgradeMaxAgents = mutation({
   },
 });
 
+export const togglePlan = mutation({
+  handler: async (ctx) => {
+    const user = await getAuthUser(ctx);
+    if (!user) throw new Error("Not authenticated");
+
+    const newPlan = user.plan === "free" ? "pro" : "free";
+    const newMaxAgents = newPlan === "pro" ? 25 : 3;
+
+    await ctx.db.patch(user._id, { plan: newPlan, maxAgents: newMaxAgents });
+    return { plan: newPlan };
+  },
+});
+
 export const me = query({
   handler: async (ctx) => {
     return await getAuthUser(ctx);
