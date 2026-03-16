@@ -13,6 +13,13 @@ import {
   ArrowRight,
   CircleDot,
   Send,
+  Search,
+  Settings,
+  Database,
+  Globe,
+  FileText,
+  Zap,
+  Eye,
 } from "lucide-react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -41,18 +48,86 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-// ── Tool call card ──────────────────────────────────────────────────────
+// ── Tool icon resolver ──────────────────────────────────────────────────
 
-function ToolCallCard({
+function getToolIcon(name: string) {
+  const lower = name.toLowerCase();
+  if (lower.includes("search") || lower.includes("find") || lower.includes("query"))
+    return Search;
+  if (lower.includes("config") || lower.includes("setting") || lower.includes("update") || lower.includes("edit"))
+    return Settings;
+  if (lower.includes("database") || lower.includes("db") || lower.includes("sql"))
+    return Database;
+  if (lower.includes("web") || lower.includes("fetch") || lower.includes("http") || lower.includes("api"))
+    return Globe;
+  if (lower.includes("read") || lower.includes("file") || lower.includes("document"))
+    return FileText;
+  if (lower.includes("preview") || lower.includes("view") || lower.includes("get"))
+    return Eye;
+  if (lower.includes("create") || lower.includes("generate") || lower.includes("run"))
+    return Zap;
+  return Wrench;
+}
+
+// ── Format tool name for display ────────────────────────────────────────
+
+function formatToolName(name: string): string {
+  // Strip MCP prefixes like "mcp__creator-tools__"
+  const stripped = name.replace(/^mcp__[^_]+__/, "");
+  return stripped;
+}
+
+// ── Summarize tool input into a short readable string ───────────────────
+
+function summarizeInput(name: string, input: any): string {
+  try {
+    const parsed = typeof input === "string" ? JSON.parse(input) : input;
+    if (!parsed || typeof parsed !== "object") return "";
+
+    // Pick the most meaningful field to show
+    const keys = Object.keys(parsed);
+    if (keys.length === 0) return "";
+
+    // Common patterns
+    if (parsed.query) return String(parsed.query);
+    if (parsed.name) return String(parsed.name);
+    if (parsed.description) return String(parsed.description).substring(0, 60);
+    if (parsed.path) return String(parsed.path);
+    if (parsed.url) return String(parsed.url);
+    if (parsed.id) return `id: ${parsed.id}`;
+    if (parsed.agentId) return `agent: ${parsed.agentId}`;
+
+    // For small objects, show key=value pairs
+    const pairs = keys
+      .slice(0, 3)
+      .map((k) => {
+        const v = parsed[k];
+        const val = typeof v === "string" ? v : JSON.stringify(v);
+        return `${k}: ${val.length > 30 ? val.substring(0, 30) + "..." : val}`;
+      });
+    return pairs.join(", ");
+  } catch {
+    return "";
+  }
+}
+
+// ── Single tool call row (inside the grouped panel) ─────────────────────
+
+function ToolCallRow({
   tc,
   isStreaming,
+  isLast,
 }: {
   tc: { id: string; name: string; input: any; output?: string };
   isStreaming: boolean;
+  isLast: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const hasOutput = tc.output !== undefined;
   const isRunning = !hasOutput && isStreaming;
+  const Icon = getToolIcon(tc.name);
+  const displayName = formatToolName(tc.name);
+  const inputSummary = summarizeInput(tc.name, tc.input);
 
   let inputDisplay = "";
   try {
@@ -63,67 +138,82 @@ function ToolCallCard({
     inputDisplay = String(tc.input ?? "");
   }
 
-  const outputPreview = tc.output
-    ? tc.output.length > 120
-      ? tc.output.substring(0, 120) + "..."
-      : tc.output
-    : null;
-
   return (
-    <div className="border border-zinc-800 rounded-xl overflow-hidden bg-zinc-900/60 backdrop-blur-sm">
+    <div className={!isLast && !expanded ? "border-b border-zinc-800/40" : ""}>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-zinc-800/50 transition-colors text-left"
+        className="w-full flex items-center gap-2.5 px-3.5 py-2 hover:bg-zinc-800/30 transition-colors text-left"
       >
-        <div className="shrink-0">
+        {/* Status + icon */}
+        <div className="shrink-0 relative">
           {isRunning ? (
-            <div className="h-5 w-5 rounded-full bg-amber-500/15 flex items-center justify-center">
-              <Loader2 className="h-3 w-3 text-amber-400 animate-spin" />
+            <div className="h-6 w-6 rounded-lg bg-amber-500/10 flex items-center justify-center">
+              <Loader2 className="h-3.5 w-3.5 text-amber-400 animate-spin" />
             </div>
           ) : hasOutput ? (
-            <div className="h-5 w-5 rounded-full bg-emerald-500/15 flex items-center justify-center">
-              <Check className="h-3 w-3 text-emerald-400" />
+            <div className="h-6 w-6 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+              <Icon className="h-3.5 w-3.5 text-emerald-400" />
             </div>
           ) : (
-            <div className="h-5 w-5 rounded-full bg-zinc-700/50 flex items-center justify-center">
-              <Wrench className="h-3 w-3 text-zinc-500" />
+            <div className="h-6 w-6 rounded-lg bg-zinc-800/60 flex items-center justify-center">
+              <Icon className="h-3.5 w-3.5 text-zinc-500" />
             </div>
           )}
         </div>
 
-        <span className="font-mono text-xs font-medium text-zinc-300 flex-1 truncate">
-          {tc.name}
-        </span>
+        {/* Name + summary */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+              tool_call
+            </span>
+            <span className="text-[10px] text-zinc-700">
+              /
+            </span>
+            <span className="font-mono text-xs font-medium text-zinc-300 truncate">
+              {displayName}
+            </span>
+          </div>
+          {inputSummary && (
+            <p className="text-[11px] text-zinc-500 truncate mt-0.5 leading-tight">
+              {inputSummary}
+            </p>
+          )}
+        </div>
 
+        {/* Status badge */}
         {isRunning && (
-          <span className="text-[10px] font-medium text-amber-400/80 uppercase tracking-wider">
+          <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-medium text-amber-400/80 bg-amber-500/10 rounded-full px-2 py-0.5">
+            <span className="h-1 w-1 rounded-full bg-amber-400 animate-pulse" />
             Running
           </span>
         )}
-        {hasOutput && !expanded && outputPreview && (
-          <span className="text-[11px] text-zinc-500 truncate max-w-[200px] hidden sm:block">
-            {outputPreview}
+        {hasOutput && (
+          <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-medium text-emerald-400/80 bg-emerald-500/10 rounded-full px-2 py-0.5">
+            <Check className="h-2.5 w-2.5" />
+            Done
           </span>
         )}
 
-        <div className="shrink-0 text-zinc-500">
+        <div className="shrink-0 text-zinc-600">
           {expanded ? (
-            <ChevronDown className="h-3.5 w-3.5" />
+            <ChevronDown className="h-3 w-3" />
           ) : (
-            <ChevronRight className="h-3.5 w-3.5" />
+            <ChevronRight className="h-3 w-3" />
           )}
         </div>
       </button>
 
+      {/* Expanded details */}
       {expanded && (
-        <div className="border-t border-zinc-800">
+        <div className="mx-3.5 mb-2.5 rounded-lg border border-zinc-800/60 bg-zinc-950/40 overflow-hidden">
           {inputDisplay && inputDisplay !== "{}" && (
-            <div className="px-3.5 py-2.5 border-b border-zinc-800/60">
-              <div className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5">
+            <div className="px-3 py-2 border-b border-zinc-800/40">
+              <div className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider mb-1">
                 Input
               </div>
               <div className="group relative">
-                <pre className="text-xs text-zinc-400 font-mono bg-zinc-950/50 rounded-lg p-2.5 overflow-x-auto max-h-48 overflow-y-auto">
+                <pre className="text-xs text-zinc-400 font-mono bg-zinc-950/50 rounded-md p-2 overflow-x-auto max-h-40 overflow-y-auto">
                   {inputDisplay}
                 </pre>
                 <CopyButton text={inputDisplay} />
@@ -132,12 +222,12 @@ function ToolCallCard({
           )}
 
           {hasOutput && tc.output && (
-            <div className="px-3.5 py-2.5">
-              <div className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider mb-1.5">
+            <div className="px-3 py-2">
+              <div className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider mb-1">
                 Output
               </div>
               <div className="group relative">
-                <pre className="text-xs text-zinc-400 font-mono bg-zinc-950/50 rounded-lg p-2.5 overflow-x-auto max-h-64 overflow-y-auto whitespace-pre-wrap break-all">
+                <pre className="text-xs text-zinc-400 font-mono bg-zinc-950/50 rounded-md p-2 overflow-x-auto max-h-48 overflow-y-auto whitespace-pre-wrap break-all">
                   {tc.output}
                 </pre>
                 <CopyButton text={tc.output} />
@@ -146,11 +236,87 @@ function ToolCallCard({
           )}
 
           {isRunning && (
-            <div className="px-3.5 py-3 flex items-center gap-2 text-xs text-zinc-500">
+            <div className="px-3 py-2 flex items-center gap-2 text-xs text-zinc-500">
               <Loader2 className="h-3 w-3 animate-spin" />
               Executing...
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Grouped tool calls panel ────────────────────────────────────────────
+
+function ToolCallsPanel({
+  toolCalls,
+  isStreaming,
+}: {
+  toolCalls: { id: string; name: string; input: any; output?: string }[];
+  isStreaming: boolean;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+
+  const completedCount = toolCalls.filter((tc) => tc.output !== undefined).length;
+  const totalCount = toolCalls.length;
+  const anyRunning = toolCalls.some((tc) => tc.output === undefined) && isStreaming;
+  const allDone = completedCount === totalCount && !isStreaming;
+
+  return (
+    <div className="border border-zinc-800/80 rounded-xl overflow-hidden bg-zinc-900/50 backdrop-blur-sm">
+      {/* Panel header */}
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        className="w-full flex items-center gap-2.5 px-3.5 py-2 hover:bg-zinc-800/30 transition-colors text-left border-b border-zinc-800/40"
+      >
+        <div className="shrink-0">
+          {anyRunning ? (
+            <div className="h-5 w-5 rounded-md bg-amber-500/10 flex items-center justify-center">
+              <Loader2 className="h-3 w-3 text-amber-400 animate-spin" />
+            </div>
+          ) : (
+            <div className="h-5 w-5 rounded-md bg-zinc-800/60 flex items-center justify-center">
+              <Wrench className="h-3 w-3 text-zinc-400" />
+            </div>
+          )}
+        </div>
+
+        <span className="text-xs font-medium text-zinc-300 flex-1">
+          {anyRunning ? "Using tools..." : "Used tools"}
+        </span>
+
+        <span className="text-[10px] text-zinc-500 tabular-nums">
+          {allDone ? (
+            <span className="inline-flex items-center gap-1 text-emerald-500/70">
+              <Check className="h-2.5 w-2.5" />
+              {totalCount} completed
+            </span>
+          ) : (
+            `${completedCount}/${totalCount}`
+          )}
+        </span>
+
+        <div className="shrink-0 text-zinc-600">
+          {collapsed ? (
+            <ChevronRight className="h-3 w-3" />
+          ) : (
+            <ChevronDown className="h-3 w-3" />
+          )}
+        </div>
+      </button>
+
+      {/* Tool call rows */}
+      {!collapsed && (
+        <div>
+          {toolCalls.map((tc, i) => (
+            <ToolCallRow
+              key={tc.id}
+              tc={tc}
+              isStreaming={isStreaming}
+              isLast={i === toolCalls.length - 1}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -311,7 +477,7 @@ export function ChatMessage({
   }
 
   // ── Assistant message ─────────────────────────────────────────────────
-  const hiddenTools = new Set(["suggest_replies", "ask_questions"]);
+  const hiddenTools = new Set(["suggest_replies", "ask_questions", "mcp__creator-tools__suggest_replies", "mcp__creator-tools__ask_questions"]);
   const visibleToolCalls = message.toolCalls?.filter(
     (tc) => !hiddenTools.has(tc.name)
   );
@@ -334,17 +500,12 @@ export function ChatMessage({
       </div>
 
       <div className="flex-1 min-w-0 space-y-3">
-        {/* Tool calls */}
+        {/* Tool calls — grouped in a single panel */}
         {hasToolCalls && (
-          <div className="space-y-2">
-            {visibleToolCalls!.map((tc) => (
-              <ToolCallCard
-                key={tc.id}
-                tc={tc}
-                isStreaming={isStreaming}
-              />
-            ))}
-          </div>
+          <ToolCallsPanel
+            toolCalls={visibleToolCalls!}
+            isStreaming={isStreaming}
+          />
         )}
 
         {/* Pending state */}
