@@ -1,11 +1,10 @@
 import { useQuery } from "convex/react";
 import { api } from "@agent-maker/shared/convex/_generated/api";
 import { Show, SignInButton } from "@clerk/react";
-import { useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { AgentCard } from "~/components/AgentCard";
-import { CreateAgentDialog } from "~/components/CreateAgentDialog";
 import { Plus, Bot } from "lucide-react";
+import { Link } from "react-router";
 import type { Route } from "./+types/home";
 
 export function meta(_args: Route.MetaArgs) {
@@ -50,22 +49,24 @@ function LandingView() {
 
 function DashboardView() {
   const agents = useQuery(api.agents.list);
-  const [showCreate, setShowCreate] = useState(false);
+
+  // Filter out draft agents from the dashboard
+  const visibleAgents = agents?.filter((a) => a.status !== "draft");
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Your Agents</h1>
-        <button
-          onClick={() => setShowCreate(true)}
+        <Link
+          to="/agents/new"
           className="flex items-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-200 transition-colors"
         >
           <Plus className="h-4 w-4" />
           New Agent
-        </button>
+        </Link>
       </div>
 
-      {agents === undefined ? (
+      {visibleAgents === undefined ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
             <div
@@ -74,29 +75,25 @@ function DashboardView() {
             />
           ))}
         </div>
-      ) : agents.length === 0 ? (
+      ) : visibleAgents.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-800 mb-4">
             <Bot className="h-6 w-6 text-zinc-500" />
           </div>
           <p className="text-zinc-400">No agents yet</p>
-          <button
-            onClick={() => setShowCreate(true)}
+          <Link
+            to="/agents/new"
             className="mt-4 text-sm text-zinc-300 hover:text-zinc-100 underline underline-offset-4"
           >
             Create your first agent
-          </button>
+          </Link>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {agents.map((agent) => (
+          {visibleAgents.map((agent) => (
             <AgentCard key={agent._id} agent={agent} />
           ))}
         </div>
-      )}
-
-      {showCreate && (
-        <CreateAgentDialog onClose={() => setShowCreate(false)} />
       )}
     </div>
   );

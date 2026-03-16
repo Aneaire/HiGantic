@@ -9,5 +9,6 @@ export default defineConfig({
     alias: {
       "~": resolve(import.meta.dirname, "app"),
     },
+    dedupe: ["react", "react-dom"],
   },
 });

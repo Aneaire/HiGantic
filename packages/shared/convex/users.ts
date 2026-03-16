@@ -30,8 +30,17 @@ export const getOrCreate = mutation({
       name: args.name,
       imageUrl: args.imageUrl,
       plan: "free",
-      maxAgents: 1,
+      maxAgents: 3,
     });
+  },
+});
+
+export const upgradeMaxAgents = mutation({
+  args: { maxAgents: v.number() },
+  handler: async (ctx, args) => {
+    const user = await getAuthUser(ctx);
+    if (!user) throw new Error("Not authenticated");
+    await ctx.db.patch(user._id, { maxAgents: args.maxAgents });
   },
 });
 

@@ -1,0 +1,581 @@
+import { query, mutation } from "./_generated/server";
+import { v } from "convex/values";
+import { requireServerAuth } from "./serverAuth";
+
+// ── QUERIES ──────────────────────────────────────────────────────────
+
+export const getAgent = query({
+  args: {
+    serverToken: v.string(),
+    agentId: v.id("agents"),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    return await ctx.db.get(args.agentId);
+  },
+});
+
+export const listMessages = query({
+  args: {
+    serverToken: v.string(),
+    conversationId: v.id("conversations"),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    return await ctx.db
+      .query("messages")
+      .withIndex("by_conversation", (q) =>
+        q.eq("conversationId", args.conversationId)
+      )
+      .collect();
+  },
+});
+
+export const listMemories = query({
+  args: {
+    serverToken: v.string(),
+    agentId: v.id("agents"),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    return await ctx.db
+      .query("memories")
+      .withIndex("by_agent", (q) => q.eq("agentId", args.agentId))
+      .take(20);
+  },
+});
+
+export const searchMemories = query({
+  args: {
+    serverToken: v.string(),
+    agentId: v.id("agents"),
+    query: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    return await ctx.db
+      .query("memories")
+      .withSearchIndex("search_content", (q) =>
+        q.search("content", args.query).eq("agentId", args.agentId)
+      )
+      .take(10);
+  },
+});
+
+// ── MUTATIONS ────────────────────────────────────────────────────────
+
+export const updateMessage = mutation({
+  args: {
+    serverToken: v.string(),
+    messageId: v.id("messages"),
+    content: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("processing"),
+      v.literal("done"),
+      v.literal("error")
+    ),
+    toolCalls: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          name: v.string(),
+          input: v.string(),
+          output: v.optional(v.string()),
+        })
+      )
+    ),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+
+    const msg = await ctx.db.get(args.messageId);
+    if (
+      msg &&
+      msg.status === "done" &&
+      (args.status === "processing" || args.status === "pending")
+    ) {
+      return { stopped: true };
+    }
+
+    await ctx.db.patch(args.messageId, {
+      content: args.content,
+      status: args.status,
+      ...(args.toolCalls !== undefined && { toolCalls: args.toolCalls }),
+    });
+    return { stopped: false };
+  },
+});
+
+export const storeMemory = mutation({
+  args: {
+    serverToken: v.string(),
+    agentId: v.id("agents"),
+    content: v.string(),
+    category: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    return await ctx.db.insert("memories", {
+      agentId: args.agentId,
+      content: args.content,
+      category: args.category,
+    });
+  },
+});
+
+// ── PAGE QUERIES ─────────────────────────────────────────────────────
+
+export const listCustomTools = query({
+  args: {
+    serverToken: v.string(),
+    agentId: v.id("agents"),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    return await ctx.db
+      .query("customTools")
+      .withIndex("by_agent", (q) => q.eq("agentId", args.agentId))
+      .collect();
+  },
+});
+
+export const listTabs = query({
+  args: {
+    serverToken: v.string(),
+    agentId: v.id("agents"),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    return await ctx.db
+      .query("sidebarTabs")
+      .withIndex("by_agent", (q) => q.eq("agentId", args.agentId))
+      .collect();
+  },
+});
+
+export const listTasks = query({
+  args: {
+    serverToken: v.string(),
+    tabId: v.id("sidebarTabs"),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    return await ctx.db
+      .query("tabTasks")
+      .withIndex("by_tab", (q) => q.eq("tabId", args.tabId))
+      .collect();
+  },
+});
+
+export const listNotes = query({
+  args: {
+    serverToken: v.string(),
+    tabId: v.id("sidebarTabs"),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    return await ctx.db
+      .query("tabNotes")
+      .withIndex("by_tab", (q) => q.eq("tabId", args.tabId))
+      .collect();
+  },
+});
+
+export const listSpreadsheetData = query({
+  args: {
+    serverToken: v.string(),
+    tabId: v.id("sidebarTabs"),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    const columns = await ctx.db
+      .query("tabSpreadsheetColumns")
+      .withIndex("by_tab", (q) => q.eq("tabId", args.tabId))
+      .collect();
+    const rows = await ctx.db
+      .query("tabSpreadsheetRows")
+      .withIndex("by_tab", (q) => q.eq("tabId", args.tabId))
+      .collect();
+    return { columns, rows: rows.sort((a, b) => a.rowIndex - b.rowIndex) };
+  },
+});
+
+// ── PAGE MUTATIONS (with ownership + size limits) ────────────────────
+
+// Size limits
+const MAX_TITLE_LENGTH = 500;
+const MAX_DESCRIPTION_LENGTH = 5000;
+const MAX_NOTE_CONTENT_LENGTH = 100000; // 100KB
+const MAX_CELL_DATA_SIZE = 50000; // 50KB serialized
+const MAX_TAB_CONFIG_SIZE = 200000; // 200KB
+const MAX_TASKS_PER_TAB = 500;
+const MAX_NOTES_PER_TAB = 200;
+
+function truncate(s: string | undefined, max: number): string | undefined {
+  if (!s) return s;
+  return s.length > max ? s.substring(0, max) : s;
+}
+
+async function requireTabOwnership(ctx: any, tabId: any, agentId: any) {
+  const tab = await ctx.db.get(tabId);
+  if (!tab) throw new Error("Tab not found");
+  if (tab.agentId !== agentId) throw new Error("Tab does not belong to this agent");
+  return tab;
+}
+
+export const createTask = mutation({
+  args: {
+    serverToken: v.string(),
+    tabId: v.id("sidebarTabs"),
+    agentId: v.id("agents"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    status: v.optional(v.union(v.literal("todo"), v.literal("in_progress"), v.literal("done"))),
+    priority: v.optional(v.union(v.literal("low"), v.literal("medium"), v.literal("high"))),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    await requireTabOwnership(ctx, args.tabId, args.agentId);
+
+    const existing = await ctx.db
+      .query("tabTasks")
+      .withIndex("by_tab", (q) => q.eq("tabId", args.tabId))
+      .collect();
+    if (existing.length >= MAX_TASKS_PER_TAB) {
+      throw new Error(`Task limit reached (${MAX_TASKS_PER_TAB})`);
+    }
+    const maxOrder = existing.reduce((max, t) => Math.max(max, t.sortOrder), -1);
+    return await ctx.db.insert("tabTasks", {
+      tabId: args.tabId,
+      agentId: args.agentId,
+      title: truncate(args.title, MAX_TITLE_LENGTH)!,
+      description: truncate(args.description, MAX_DESCRIPTION_LENGTH),
+      status: args.status ?? "todo",
+      priority: args.priority,
+      sortOrder: maxOrder + 1,
+    });
+  },
+});
+
+export const updateTask = mutation({
+  args: {
+    serverToken: v.string(),
+    taskId: v.id("tabTasks"),
+    title: v.optional(v.string()),
+    description: v.optional(v.string()),
+    status: v.optional(v.union(v.literal("todo"), v.literal("in_progress"), v.literal("done"))),
+    priority: v.optional(v.union(v.literal("low"), v.literal("medium"), v.literal("high"))),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    const task = await ctx.db.get(args.taskId);
+    if (!task) throw new Error("Task not found");
+    // Verify ownership via tab
+    const tab = await ctx.db.get(task.tabId);
+    if (!tab) throw new Error("Tab not found");
+
+    const { serverToken, taskId, ...updates } = args;
+    const filtered: Record<string, any> = {};
+    if (updates.title !== undefined) filtered.title = truncate(updates.title, MAX_TITLE_LENGTH);
+    if (updates.description !== undefined) filtered.description = truncate(updates.description, MAX_DESCRIPTION_LENGTH);
+    if (updates.status !== undefined) filtered.status = updates.status;
+    if (updates.priority !== undefined) filtered.priority = updates.priority;
+
+    await ctx.db.patch(taskId, filtered);
+  },
+});
+
+export const createNote = mutation({
+  args: {
+    serverToken: v.string(),
+    tabId: v.id("sidebarTabs"),
+    agentId: v.id("agents"),
+    title: v.string(),
+    content: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    await requireTabOwnership(ctx, args.tabId, args.agentId);
+
+    const existing = await ctx.db
+      .query("tabNotes")
+      .withIndex("by_tab", (q) => q.eq("tabId", args.tabId))
+      .collect();
+    if (existing.length >= MAX_NOTES_PER_TAB) {
+      throw new Error(`Note limit reached (${MAX_NOTES_PER_TAB})`);
+    }
+
+    return await ctx.db.insert("tabNotes", {
+      tabId: args.tabId,
+      agentId: args.agentId,
+      title: truncate(args.title, MAX_TITLE_LENGTH)!,
+      content: truncate(args.content, MAX_NOTE_CONTENT_LENGTH) ?? "",
+      updatedAt: Date.now(),
+    });
+  },
+});
+
+export const updateNote = mutation({
+  args: {
+    serverToken: v.string(),
+    noteId: v.id("tabNotes"),
+    title: v.optional(v.string()),
+    content: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    const note = await ctx.db.get(args.noteId);
+    if (!note) throw new Error("Note not found");
+    const tab = await ctx.db.get(note.tabId);
+    if (!tab) throw new Error("Tab not found");
+
+    const filtered: Record<string, any> = { updatedAt: Date.now() };
+    if (args.title !== undefined) filtered.title = truncate(args.title, MAX_TITLE_LENGTH);
+    if (args.content !== undefined) filtered.content = truncate(args.content, MAX_NOTE_CONTENT_LENGTH);
+
+    await ctx.db.patch(args.noteId, filtered);
+  },
+});
+
+export const addSpreadsheetRow = mutation({
+  args: {
+    serverToken: v.string(),
+    tabId: v.id("sidebarTabs"),
+    agentId: v.id("agents"),
+    data: v.any(),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    await requireTabOwnership(ctx, args.tabId, args.agentId);
+
+    // Validate data size
+    const serialized = JSON.stringify(args.data);
+    if (serialized.length > MAX_CELL_DATA_SIZE) {
+      throw new Error(`Row data too large (${serialized.length} chars, max ${MAX_CELL_DATA_SIZE})`);
+    }
+
+    const existing = await ctx.db
+      .query("tabSpreadsheetRows")
+      .withIndex("by_tab", (q) => q.eq("tabId", args.tabId))
+      .collect();
+    if (existing.length >= 10000) throw new Error("Row limit reached (10,000)");
+    const maxIndex = existing.reduce((max, r) => Math.max(max, r.rowIndex), -1);
+    return await ctx.db.insert("tabSpreadsheetRows", {
+      tabId: args.tabId,
+      agentId: args.agentId,
+      rowIndex: maxIndex + 1,
+      data: args.data,
+    });
+  },
+});
+
+export const updateSpreadsheetRow = mutation({
+  args: {
+    serverToken: v.string(),
+    rowId: v.id("tabSpreadsheetRows"),
+    data: v.any(),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    const row = await ctx.db.get(args.rowId);
+    if (!row) throw new Error("Row not found");
+    const tab = await ctx.db.get(row.tabId);
+    if (!tab) throw new Error("Tab not found");
+
+    const serialized = JSON.stringify(args.data);
+    if (serialized.length > MAX_CELL_DATA_SIZE) {
+      throw new Error(`Row data too large (${serialized.length} chars, max ${MAX_CELL_DATA_SIZE})`);
+    }
+
+    await ctx.db.patch(args.rowId, { data: args.data });
+  },
+});
+
+export const createPage = mutation({
+  args: {
+    serverToken: v.string(),
+    agentId: v.id("agents"),
+    label: v.string(),
+    type: v.union(
+      v.literal("tasks"),
+      v.literal("notes"),
+      v.literal("spreadsheet"),
+      v.literal("markdown"),
+      v.literal("data_table")
+    ),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    const agent = await ctx.db.get(args.agentId);
+    if (!agent) throw new Error("Agent not found");
+
+    const slug = args.label
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    const existing = await ctx.db
+      .query("sidebarTabs")
+      .withIndex("by_agent", (q) => q.eq("agentId", args.agentId))
+      .collect();
+
+    const maxOrder = existing.reduce(
+      (max, t) => Math.max(max, t.sortOrder),
+      -1
+    );
+
+    return await ctx.db.insert("sidebarTabs", {
+      agentId: args.agentId,
+      label: args.label.substring(0, 100),
+      slug,
+      type: args.type,
+      sortOrder: maxOrder + 1,
+    });
+  },
+});
+
+export const addSpreadsheetColumn = mutation({
+  args: {
+    serverToken: v.string(),
+    tabId: v.id("sidebarTabs"),
+    agentId: v.id("agents"),
+    name: v.string(),
+    type: v.union(
+      v.literal("text"),
+      v.literal("number"),
+      v.literal("date"),
+      v.literal("checkbox")
+    ),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    await requireTabOwnership(ctx, args.tabId, args.agentId);
+
+    const existing = await ctx.db
+      .query("tabSpreadsheetColumns")
+      .withIndex("by_tab", (q) => q.eq("tabId", args.tabId))
+      .collect();
+    if (existing.length >= 100) throw new Error("Column limit reached (100)");
+
+    const maxOrder = existing.reduce(
+      (max, c) => Math.max(max, c.sortOrder),
+      -1
+    );
+
+    return await ctx.db.insert("tabSpreadsheetColumns", {
+      tabId: args.tabId,
+      agentId: args.agentId,
+      name: args.name.substring(0, 100),
+      type: args.type,
+      sortOrder: maxOrder + 1,
+    });
+  },
+});
+
+export const updateTabConfig = mutation({
+  args: {
+    serverToken: v.string(),
+    tabId: v.id("sidebarTabs"),
+    config: v.any(),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    const tab = await ctx.db.get(args.tabId);
+    if (!tab) throw new Error("Tab not found");
+
+    const serialized = JSON.stringify(args.config);
+    if (serialized.length > MAX_TAB_CONFIG_SIZE) {
+      throw new Error(`Config too large (${serialized.length} chars, max ${MAX_TAB_CONFIG_SIZE})`);
+    }
+
+    await ctx.db.patch(args.tabId, { config: args.config });
+  },
+});
+
+// ── API ENDPOINT QUERIES ─────────────────────────────────────────────
+
+export const getApiEndpoint = query({
+  args: {
+    serverToken: v.string(),
+    agentId: v.id("agents"),
+    slug: v.string(),
+    method: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    const endpoints = await ctx.db
+      .query("tabApiEndpoints")
+      .withIndex("by_agent_slug", (q) =>
+        q.eq("agentId", args.agentId).eq("slug", args.slug)
+      )
+      .collect();
+    return endpoints.find(
+      (e) => e.method === args.method && e.isActive
+    ) ?? null;
+  },
+});
+
+export const validateApiKey = query({
+  args: {
+    serverToken: v.string(),
+    apiKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    const keyRecord = await ctx.db
+      .query("agentApiKeys")
+      .withIndex("by_key", (q) => q.eq("key", args.apiKey))
+      .first();
+    if (!keyRecord) return null;
+    return { agentId: keyRecord.agentId, userId: keyRecord.userId };
+  },
+});
+
+export const setQuestions = mutation({
+  args: {
+    serverToken: v.string(),
+    messageId: v.id("messages"),
+    questions: v.array(
+      v.object({
+        id: v.string(),
+        question: v.string(),
+        options: v.array(v.string()),
+      })
+    ),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    await ctx.db.patch(args.messageId, {
+      questions: args.questions.slice(0, 6),
+    });
+  },
+});
+
+export const setSuggestions = mutation({
+  args: {
+    serverToken: v.string(),
+    messageId: v.id("messages"),
+    suggestions: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    await ctx.db.patch(args.messageId, {
+      suggestions: args.suggestions.slice(0, 4),
+    });
+  },
+});
+
+export const updateConversationTitle = mutation({
+  args: {
+    serverToken: v.string(),
+    conversationId: v.id("conversations"),
+    title: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    await ctx.db.patch(args.conversationId, {
+      title: args.title,
+    });
+  },
+});

@@ -51,21 +51,144 @@ export default defineSchema({
     headers: v.optional(v.any()),
   }).index("by_agent", ["agentId"]),
 
+  // ── Sidebar Tabs (Agent Pages) ─────────────────────────────────────
+
   sidebarTabs: defineTable({
     agentId: v.id("agents"),
     label: v.string(),
     slug: v.string(),
     icon: v.optional(v.string()),
     type: v.union(
-      v.literal("memories"),
-      v.literal("data_table"),
-      v.literal("iframe"),
+      v.literal("tasks"),
+      v.literal("notes"),
+      v.literal("spreadsheet"),
       v.literal("markdown"),
-      v.literal("kanban")
+      v.literal("data_table"),
+      v.literal("postgres"),
+      v.literal("api")
     ),
     config: v.optional(v.any()),
     sortOrder: v.number(),
   }).index("by_agent", ["agentId"]),
+
+  // ── Tasks (backing table for "tasks" tabs) ─────────────────────────
+
+  tabTasks: defineTable({
+    tabId: v.id("sidebarTabs"),
+    agentId: v.id("agents"),
+    title: v.string(),
+    description: v.optional(v.string()),
+    status: v.union(
+      v.literal("todo"),
+      v.literal("in_progress"),
+      v.literal("done")
+    ),
+    priority: v.optional(
+      v.union(v.literal("low"), v.literal("medium"), v.literal("high"))
+    ),
+    sortOrder: v.number(),
+  })
+    .index("by_tab", ["tabId"])
+    .index("by_agent", ["agentId"])
+    .index("by_tab_status", ["tabId", "status"])
+    .searchIndex("search_title", {
+      searchField: "title",
+      filterFields: ["tabId"],
+    }),
+
+  // ── Notes (backing table for "notes" tabs) ─────────────────────────
+
+  tabNotes: defineTable({
+    tabId: v.id("sidebarTabs"),
+    agentId: v.id("agents"),
+    title: v.string(),
+    content: v.string(),
+    updatedAt: v.number(),
+  })
+    .index("by_tab", ["tabId"])
+    .index("by_agent", ["agentId"])
+    .searchIndex("search_notes", {
+      searchField: "content",
+      filterFields: ["tabId"],
+    }),
+
+  // ── Spreadsheet (backing tables for "spreadsheet" tabs) ────────────
+
+  tabSpreadsheetColumns: defineTable({
+    tabId: v.id("sidebarTabs"),
+    agentId: v.id("agents"),
+    name: v.string(),
+    type: v.union(
+      v.literal("text"),
+      v.literal("number"),
+      v.literal("date"),
+      v.literal("checkbox")
+    ),
+    sortOrder: v.number(),
+  }).index("by_tab", ["tabId"]),
+
+  tabSpreadsheetRows: defineTable({
+    tabId: v.id("sidebarTabs"),
+    agentId: v.id("agents"),
+    rowIndex: v.number(),
+    data: v.any(), // JSON object: { columnName: value }
+  })
+    .index("by_tab", ["tabId"])
+    .index("by_tab_row", ["tabId", "rowIndex"]),
+
+  // ── PostgreSQL Connections (premium add-on) ────────────────────────
+
+  agentDatabases: defineTable({
+    agentId: v.id("agents"),
+    tabId: v.id("sidebarTabs"),
+    displayName: v.string(),
+    connectionString: v.string(), // encrypted at rest
+    status: v.union(
+      v.literal("connected"),
+      v.literal("disconnected"),
+      v.literal("error")
+    ),
+    lastTestedAt: v.optional(v.number()),
+  })
+    .index("by_agent", ["agentId"])
+    .index("by_tab", ["tabId"]),
+
+  // ── API Endpoints (backing table for "api" tabs) ────────────────────
+
+  tabApiEndpoints: defineTable({
+    tabId: v.id("sidebarTabs"),
+    agentId: v.id("agents"),
+    name: v.string(),
+    slug: v.string(),
+    method: v.union(
+      v.literal("GET"),
+      v.literal("POST"),
+      v.literal("PUT"),
+      v.literal("DELETE"),
+      v.literal("PATCH")
+    ),
+    description: v.optional(v.string()),
+    promptTemplate: v.string(), // Instruction for the agent on how to handle this endpoint
+    responseFormat: v.union(v.literal("json"), v.literal("text")),
+    isActive: v.boolean(),
+  })
+    .index("by_tab", ["tabId"])
+    .index("by_agent", ["agentId"])
+    .index("by_agent_slug", ["agentId", "slug"]),
+
+  // API keys for authenticating external calls
+  agentApiKeys: defineTable({
+    agentId: v.id("agents"),
+    userId: v.id("users"),
+    key: v.string(),
+    label: v.string(),
+    lastUsedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_agent", ["agentId"])
+    .index("by_key", ["key"]),
+
+  // ── Core Tables ────────────────────────────────────────────────────
 
   conversations: defineTable({
     agentId: v.id("agents"),
@@ -101,6 +224,16 @@ export default defineSchema({
       )
     ),
     error: v.optional(v.string()),
+    suggestions: v.optional(v.array(v.string())),
+    questions: v.optional(
+      v.array(
+        v.object({
+          id: v.string(),
+          question: v.string(),
+          options: v.array(v.string()),
+        })
+      )
+    ),
   }).index("by_conversation", ["conversationId"]),
 
   memories: defineTable({

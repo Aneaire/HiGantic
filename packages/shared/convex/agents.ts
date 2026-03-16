@@ -57,8 +57,8 @@ export const create = mutation({
       description: args.description,
       systemPrompt:
         args.systemPrompt ?? `You are ${args.name}, a helpful AI assistant.`,
-      model: "claude-sonnet-4-20250514",
-      enabledToolSets: ["memory"],
+      model: "claude-sonnet-4-6",
+      enabledToolSets: ["memory", "web_search", "pages", "custom_http_tools"],
       status: "active",
     });
   },

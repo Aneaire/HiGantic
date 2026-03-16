@@ -8,12 +8,23 @@
  * @module
  */
 
+import type * as agentApi from "../agentApi.js";
+import type * as agentDatabases from "../agentDatabases.js";
 import type * as agentJobs from "../agentJobs.js";
 import type * as agents from "../agents.js";
 import type * as auth from "../auth.js";
 import type * as conversations from "../conversations.js";
+import type * as creatorApi from "../creatorApi.js";
+import type * as creatorSessions from "../creatorSessions.js";
+import type * as customTools from "../customTools.js";
 import type * as memories from "../memories.js";
 import type * as messages from "../messages.js";
+import type * as serverAuth from "../serverAuth.js";
+import type * as sidebarTabs from "../sidebarTabs.js";
+import type * as tabApiEndpoints from "../tabApiEndpoints.js";
+import type * as tabNotes from "../tabNotes.js";
+import type * as tabSpreadsheet from "../tabSpreadsheet.js";
+import type * as tabTasks from "../tabTasks.js";
 import type * as users from "../users.js";
 
 import type {
@@ -23,12 +34,23 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  agentApi: typeof agentApi;
+  agentDatabases: typeof agentDatabases;
   agentJobs: typeof agentJobs;
   agents: typeof agents;
   auth: typeof auth;
   conversations: typeof conversations;
+  creatorApi: typeof creatorApi;
+  creatorSessions: typeof creatorSessions;
+  customTools: typeof customTools;
   memories: typeof memories;
   messages: typeof messages;
+  serverAuth: typeof serverAuth;
+  sidebarTabs: typeof sidebarTabs;
+  tabApiEndpoints: typeof tabApiEndpoints;
+  tabNotes: typeof tabNotes;
+  tabSpreadsheet: typeof tabSpreadsheet;
+  tabTasks: typeof tabTasks;
   users: typeof users;
 }>;
 

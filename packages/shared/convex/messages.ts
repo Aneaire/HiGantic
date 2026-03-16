@@ -99,6 +99,57 @@ export const updateContent = mutation({
   },
 });
 
+export const stop = mutation({
+  args: {
+    conversationId: v.id("conversations"),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireAuthUser(ctx);
+    const conv = await ctx.db.get(args.conversationId);
+    if (!conv || conv.userId !== user._id) {
+      throw new Error("Conversation not found");
+    }
+
+    // Find active assistant messages and mark them done
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_conversation", (q) =>
+        q.eq("conversationId", args.conversationId)
+      )
+      .collect();
+
+    for (const msg of messages) {
+      if (
+        msg.role === "assistant" &&
+        (msg.status === "pending" || msg.status === "processing")
+      ) {
+        await ctx.db.patch(msg._id, {
+          status: "done",
+          content: msg.content || "(Stopped)",
+        });
+      }
+    }
+
+    // Also mark any pending/processing jobs as done
+    const jobs = await ctx.db
+      .query("agentJobs")
+      .withIndex("by_agent", (q) => q.eq("agentId", conv.agentId))
+      .collect();
+
+    for (const job of jobs) {
+      if (
+        job.conversationId === args.conversationId &&
+        (job.status === "pending" || job.status === "processing")
+      ) {
+        await ctx.db.patch(job._id, {
+          status: "done",
+          completedAt: Date.now(),
+        });
+      }
+    }
+  },
+});
+
 export const updateStatus = mutation({
   args: {
     messageId: v.id("messages"),
