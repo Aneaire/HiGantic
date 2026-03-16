@@ -11,17 +11,88 @@ interface CreatorContext {
 export function createCreatorTools(
   convexClient: CreatorConvexClient,
   agentId: string,
-  userPlan: string = "free"
+  userPlan: string = "free",
+  messageId?: string
 ) {
   const ctx: CreatorContext = { convexClient, agentId, userPlan };
-  return [
+  const tools = [
     createUpdateConfigTool(ctx),
     createPreviewConfigTool(ctx),
     createListToolSetsTool(ctx),
     createUseTemplateTool(ctx),
     createStarterPagesTool(ctx),
+    createApiEndpointsTool(ctx),
     createFinalizeTool(ctx),
   ];
+
+  if (messageId) {
+    tools.push(
+      ...createCreatorSuggestTools(convexClient, messageId)
+    );
+  }
+
+  return tools;
+}
+
+// ── Suggest & Question Tools ──────────────────────────────────────────
+
+function createCreatorSuggestTools(
+  convexClient: CreatorConvexClient,
+  messageId: string
+) {
+  const suggestReplies = tool(
+    "suggest_replies",
+    "Suggest 2-4 follow-up options the user might want. Call at the END of your response. Keep each under 60 chars, specific and actionable.",
+    {
+      suggestions: z
+        .array(z.string())
+        .min(2)
+        .max(4)
+        .describe("Suggested follow-up messages"),
+    },
+    async (input) => {
+      await convexClient.setSuggestions(messageId, input.suggestions);
+      return {
+        content: [
+          { type: "text" as const, text: `Set ${input.suggestions.length} suggestions.` },
+        ],
+      };
+    }
+  );
+
+  const askQuestions = tool(
+    "ask_questions",
+    `Present interactive multiple-choice questions to the user. Use this INSTEAD of writing options as bullet points in your text. Each question renders as a clickable card. Do NOT duplicate the questions in your text — the tool handles display. Always include a flexible last option like "Something else" or "Custom name" so the user can type their own answer.`,
+    {
+      questions: z
+        .array(
+          z.object({
+            id: z.string().describe("Unique short ID, e.g. 'page_name'"),
+            question: z.string().describe("The question text"),
+            options: z
+              .array(z.string())
+              .min(2)
+              .max(6)
+              .describe("Selectable options, keep each under 40 chars"),
+          })
+        )
+        .min(1)
+        .max(6),
+    },
+    async (input) => {
+      await convexClient.setQuestions(messageId, input.questions);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Presented ${input.questions.length} question(s). Wait for the user's selections.`,
+          },
+        ],
+      };
+    }
+  );
+
+  return [suggestReplies, askQuestions];
 }
 
 // ── Update Agent Config ───────────────────────────────────────────────
@@ -173,6 +244,14 @@ const TEMPLATES: Record<
     model: string;
     enabledToolSets: string[];
     starterPages?: Array<{ label: string; type: string }>;
+    starterEndpoints?: Array<{
+      tabLabel: string;
+      name: string;
+      method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+      description?: string;
+      promptTemplate: string;
+      responseFormat?: "json" | "text";
+    }>;
   }
 > = {
   customer_support: {
@@ -285,6 +364,88 @@ Help users write, edit, and improve content — from emails and blog posts to re
       { label: "Ideas", type: "notes" },
     ],
   },
+  api_service: {
+    name: "API Service Agent",
+    description: "Agent exposed as a REST API with full page access for external integrations",
+    systemPrompt: `You are an API service agent that processes incoming requests and returns structured responses.
+
+## Your Role
+Handle API requests from external systems. You have full access to your pages (spreadsheets, tasks, notes) and should use them to read, write, and query data as instructed by each endpoint.
+
+## Tone & Style
+- Precise and machine-friendly
+- Always return valid, parseable responses
+- Be consistent in response structure
+- Include relevant data fields without unnecessary verbosity
+
+## Guidelines
+- Follow each endpoint's prompt template exactly
+- When responding in JSON format, always return valid JSON with consistent field names
+- Use your page tools (list_spreadsheet_data, list_tasks, list_notes, etc.) to read and write data
+- Match page names from the prompt to your available pages listed in "Your Pages" above
+- If input data is malformed or missing required fields, return a clear error response like: { "error": "Missing required field: name" }
+- Keep responses focused on the requested data — no conversational filler
+- When querying spreadsheets, use list_spreadsheet_data and filter the results in your response
+- When the request asks to create/update data, use the appropriate write tools and confirm the action`,
+    model: "claude-sonnet-4-6",
+    enabledToolSets: ["memory", "web_search", "pages", "custom_http_tools", "rest_api"],
+    starterPages: [
+      { label: "API Endpoints", type: "api" },
+      { label: "Data", type: "spreadsheet" },
+      { label: "Logs", type: "notes" },
+    ],
+    starterEndpoints: [
+      {
+        tabLabel: "API Endpoints",
+        name: "List Records",
+        method: "GET",
+        description: "List all rows from the Data spreadsheet, with optional filtering via query params",
+        promptTemplate: `Use list_spreadsheet_data on the "Data" spreadsheet to get all rows.
+
+If query parameters are provided, filter the results:
+- If a "column" and "value" param are present, only return rows where that column matches the value.
+- If a "limit" param is present, return at most that many rows.
+- If a "search" param is present, return rows where any column contains that text.
+
+Return the results as a JSON array of objects, where each object's keys are the column names.
+Example: [{"Name": "Alice", "Email": "alice@example.com"}, ...]
+
+If the spreadsheet is empty, return an empty array: []`,
+        responseFormat: "json",
+      },
+      {
+        tabLabel: "API Endpoints",
+        name: "Get Record",
+        method: "POST",
+        description: "Query a single record from the Data spreadsheet by matching a field value",
+        promptTemplate: `Use list_spreadsheet_data on the "Data" spreadsheet.
+
+The request body will contain a query like: { "column": "Name", "value": "Alice" }
+
+Find the first row where the specified column matches the specified value.
+Return the matching row as a JSON object with column names as keys.
+
+If no match is found, return: { "error": "No record found", "query": <the original query> }`,
+        responseFormat: "json",
+      },
+      {
+        tabLabel: "API Endpoints",
+        name: "Add Record",
+        method: "POST",
+        description: "Add a new row to the Data spreadsheet from request body",
+        promptTemplate: `Add a new row to the "Data" spreadsheet using add_spreadsheet_row.
+
+The request body contains the row data as key-value pairs matching column names.
+Example body: { "Name": "Bob", "Email": "bob@example.com", "Status": "active" }
+
+Use add_spreadsheet_row with the provided data.
+Return: { "success": true, "message": "Record added", "data": <the data that was added> }
+
+If required columns are missing from the body, return: { "error": "Missing fields", "required": [<list the spreadsheet column names>] }`,
+        responseFormat: "json",
+      },
+    ],
+  },
   data_analyst: {
     name: "Data Analyst",
     description: "Analytical assistant that helps organize, track, and analyze data",
@@ -365,16 +526,46 @@ function createUseTemplateTool(ctx: CreatorContext) {
         }
       }
 
+      // Create starter API endpoints
+      const createdEndpoints: string[] = [];
+      if (template.starterEndpoints) {
+        for (const ep of template.starterEndpoints) {
+          try {
+            const tabId = await ctx.convexClient.findTabByLabel(
+              ctx.agentId,
+              ep.tabLabel
+            );
+            if (tabId) {
+              await ctx.convexClient.createApiEndpoint(ctx.agentId, tabId, {
+                name: ep.name,
+                method: ep.method,
+                description: ep.description,
+                promptTemplate: ep.promptTemplate,
+                responseFormat: ep.responseFormat,
+              });
+              createdEndpoints.push(`${ep.method} "${ep.name}"`);
+            }
+          } catch (err: any) {
+            console.error(`[creator] Failed to create endpoint "${ep.name}":`, err.message);
+          }
+        }
+      }
+
       const pagesNote =
         createdPages.length > 0
           ? `\n\nAlso created starter pages: ${createdPages.join(", ")}`
+          : "";
+
+      const endpointsNote =
+        createdEndpoints.length > 0
+          ? `\nCreated API endpoints: ${createdEndpoints.join(", ")}`
           : "";
 
       return {
         content: [
           {
             type: "text" as const,
-            text: `Applied "${input.templateId}" template: ${template.name}.\nSet name, description, system prompt, model (${template.model}), and tool sets.${pagesNote}\n\nThe user can now customize any of these. Show them a summary and ask if they'd like to adjust anything.`,
+            text: `Applied "${input.templateId}" template: ${template.name}.\nSet name, description, system prompt, model (${template.model}), and tool sets.${pagesNote}${endpointsNote}\n\nThe user can now customize any of these. Show them a summary and ask if they'd like to adjust anything.`,
           },
         ],
       };
@@ -396,7 +587,7 @@ function createStarterPagesTool(ctx: CreatorContext) {
               .string()
               .describe("Display name for the page (e.g. 'Project Tasks')"),
             type: z
-              .enum(["tasks", "notes", "spreadsheet", "markdown", "data_table"])
+              .enum(["tasks", "notes", "spreadsheet", "markdown", "data_table", "api"])
               .describe("Page type"),
           })
         )
@@ -436,12 +627,137 @@ function createStarterPagesTool(ctx: CreatorContext) {
   );
 }
 
+// ── Create API Endpoints ──────────────────────────────────────────────
+
+function createApiEndpointsTool(ctx: CreatorContext) {
+  return tool(
+    "create_api_endpoints",
+    `Create REST API endpoints on an existing API page. The agent must have an API page created first (via create_starter_pages with type "api"). Each endpoint defines how external systems interact with the agent. Requires Pro+ plan.
+
+IMPORTANT: The agent already knows its pages and tab IDs from its system prompt (injected as "## Your Pages"). Prompt templates should instruct the agent to use its page tools to read/write data. You do NOT need to hardcode tab IDs — the agent resolves them at runtime.
+
+## Available page tools the agent can use at runtime:
+- list_spreadsheet_data(tabId) — get all columns and rows from a spreadsheet
+- list_tasks(tabId) — list all tasks from a task board
+- list_notes(tabId) — list all notes from a notes page
+- add_spreadsheet_row(tabId, data) — add a row to a spreadsheet
+- create_task(tabId, title, description, status, priority) — create a task
+- save_note(tabId, title, content) — create a note
+- update_spreadsheet_row(rowId, data) — update a specific row
+- update_task(taskId, ...) — update a specific task
+- update_note(noteId, ...) — update a specific note
+
+## Prompt template tips:
+- Reference pages by name: "Use the list_spreadsheet_data tool on the 'Products' spreadsheet"
+- For filtering: "Find the row where Name equals the value from the request body"
+- For queries: "Use list_spreadsheet_data on the 'Inventory' spreadsheet, then filter rows where 'quantity' < 10"
+- The agent will match page names to tab IDs automatically from its system prompt context`,
+    {
+      tabLabel: z
+        .string()
+        .describe(
+          'The label of the API page to add endpoints to (e.g. "API Endpoints")'
+        ),
+      endpoints: z
+        .array(
+          z.object({
+            name: z
+              .string()
+              .max(100)
+              .describe(
+                'Display name for the endpoint (e.g. "Analyze Sentiment")'
+              ),
+            method: z
+              .enum(["GET", "POST", "PUT", "DELETE", "PATCH"])
+              .describe("HTTP method"),
+            description: z
+              .string()
+              .max(500)
+              .optional()
+              .describe("Short description of what this endpoint does"),
+            promptTemplate: z
+              .string()
+              .max(5000)
+              .describe(
+                'Instructions for the agent when handling this endpoint. Tell the agent which page tools to use and how to process the data. The agent already knows its pages and their IDs from the system prompt.'
+              ),
+            responseFormat: z
+              .enum(["json", "text"])
+              .default("json")
+              .describe("Response format — json or text"),
+          })
+        )
+        .min(1)
+        .max(10)
+        .describe("Array of endpoints to create"),
+    },
+    async (input) => {
+      if (ctx.userPlan === "free") {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "REST API endpoints require a Pro or Enterprise plan. The user can still create the agent and upgrade later to enable API endpoints.",
+            },
+          ],
+        };
+      }
+
+      // Find the API tab by label
+      const tabId = await ctx.convexClient.findTabByLabel(
+        ctx.agentId,
+        input.tabLabel
+      );
+      if (!tabId) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `No API page found with label "${input.tabLabel}". Create one first using create_starter_pages with type "api".`,
+            },
+          ],
+        };
+      }
+
+      const created: string[] = [];
+      const errors: string[] = [];
+
+      for (const ep of input.endpoints) {
+        try {
+          await ctx.convexClient.createApiEndpoint(ctx.agentId, tabId, {
+            name: ep.name,
+            method: ep.method,
+            description: ep.description,
+            promptTemplate: ep.promptTemplate,
+            responseFormat: ep.responseFormat,
+          });
+          created.push(`${ep.method} "${ep.name}"`);
+        } catch (err: any) {
+          errors.push(`"${ep.name}": ${err.message}`);
+        }
+      }
+
+      let text = "";
+      if (created.length > 0) {
+        text += `Created ${created.length} endpoint(s): ${created.join(", ")}`;
+      }
+      if (errors.length > 0) {
+        text += `\nFailed: ${errors.join("; ")}`;
+      }
+
+      return {
+        content: [{ type: "text" as const, text }],
+      };
+    }
+  );
+}
+
 // ── Finalize Agent ────────────────────────────────────────────────────
 
 function createFinalizeTool(ctx: CreatorContext) {
   return tool(
     "finalize_agent",
-    "Finalize and activate the agent. Call this ONLY when the user has confirmed they are happy with the configuration. This sets the agent to active and completes the creation process.",
+    "Finalize and save the agent. Call this ONLY when the user has confirmed they are happy with the configuration. For new agents, this activates them. For existing agents being edited, this saves all changes and completes the editing session.",
     {},
     async () => {
       const config = await ctx.convexClient.getAgentConfig(ctx.agentId);

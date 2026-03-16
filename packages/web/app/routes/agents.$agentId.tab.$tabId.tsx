@@ -51,7 +51,6 @@ export default function DynamicTabPage() {
     case "spreadsheet":
       return <SpreadsheetPage tab={tab} />;
     case "markdown":
-    case "data_table":
       return <MarkdownPage tab={tab} />;
     case "postgres":
       return <PostgresPage tab={tab} />;

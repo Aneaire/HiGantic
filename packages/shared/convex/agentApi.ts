@@ -231,7 +231,7 @@ export const createTask = mutation({
     agentId: v.id("agents"),
     title: v.string(),
     description: v.optional(v.string()),
-    status: v.optional(v.union(v.literal("todo"), v.literal("in_progress"), v.literal("done"))),
+    status: v.optional(v.string()),
     priority: v.optional(v.union(v.literal("low"), v.literal("medium"), v.literal("high"))),
   },
   handler: async (ctx, args) => {
@@ -264,7 +264,7 @@ export const updateTask = mutation({
     taskId: v.id("tabTasks"),
     title: v.optional(v.string()),
     description: v.optional(v.string()),
-    status: v.optional(v.union(v.literal("todo"), v.literal("in_progress"), v.literal("done"))),
+    status: v.optional(v.string()),
     priority: v.optional(v.union(v.literal("low"), v.literal("medium"), v.literal("high"))),
   },
   handler: async (ctx, args) => {
@@ -402,7 +402,8 @@ export const createPage = mutation({
       v.literal("notes"),
       v.literal("spreadsheet"),
       v.literal("markdown"),
-      v.literal("data_table")
+      v.literal("data_table"),
+      v.literal("api")
     ),
   },
   handler: async (ctx, args) => {
@@ -581,6 +582,87 @@ export const setSuggestions = mutation({
     await requireServerAuth(ctx, args.serverToken);
     await ctx.db.patch(args.messageId, {
       suggestions: args.suggestions.slice(0, 4),
+    });
+  },
+});
+
+export const findTabByLabel = query({
+  args: {
+    serverToken: v.string(),
+    agentId: v.id("agents"),
+    label: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    const tabs = await ctx.db
+      .query("sidebarTabs")
+      .withIndex("by_agent", (q) => q.eq("agentId", args.agentId))
+      .collect();
+    const tab = tabs.find((t) => t.label === args.label);
+    return tab ? tab._id : null;
+  },
+});
+
+export const createApiEndpoint = mutation({
+  args: {
+    serverToken: v.string(),
+    agentId: v.id("agents"),
+    tabId: v.id("sidebarTabs"),
+    name: v.string(),
+    method: v.union(
+      v.literal("GET"),
+      v.literal("POST"),
+      v.literal("PUT"),
+      v.literal("DELETE"),
+      v.literal("PATCH")
+    ),
+    description: v.optional(v.string()),
+    promptTemplate: v.string(),
+    responseFormat: v.optional(
+      v.union(v.literal("json"), v.literal("text"))
+    ),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+
+    const tab = await ctx.db.get(args.tabId);
+    if (!tab || tab.agentId !== args.agentId || tab.type !== "api") {
+      throw new Error("API tab not found");
+    }
+
+    const existing = await ctx.db
+      .query("tabApiEndpoints")
+      .withIndex("by_tab", (q) => q.eq("tabId", args.tabId))
+      .collect();
+    if (existing.length >= 20) {
+      throw new Error("Maximum 20 endpoints per API page");
+    }
+
+    const slug = args.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    const dupes = await ctx.db
+      .query("tabApiEndpoints")
+      .withIndex("by_agent_slug", (q) =>
+        q.eq("agentId", args.agentId).eq("slug", slug)
+      )
+      .collect();
+    if (dupes.length > 0) {
+      throw new Error(`Endpoint slug "${slug}" already exists for this agent`);
+    }
+
+    return await ctx.db.insert("tabApiEndpoints", {
+      tabId: args.tabId,
+      agentId: args.agentId,
+      name: args.name.substring(0, 100),
+      slug,
+      method: args.method,
+      description: args.description?.substring(0, 500),
+      promptTemplate: args.promptTemplate.substring(0, 5000),
+      responseFormat: args.responseFormat ?? "json",
+      isActive: true,
     });
   },
 });

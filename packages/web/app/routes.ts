@@ -3,6 +3,8 @@ import { type RouteConfig, index, route } from "@react-router/dev/routes";
 export default [
   index("routes/home.tsx"),
   route("agents/new", "routes/agents.new.tsx"),
+  route("agents/new/creator", "routes/agents.new.creator.tsx"),
+  route("agents/:agentId/editor", "routes/agents.$agentId.editor.tsx"),
   route("agents/:agentId", "routes/agents.$agentId.tsx", [
     index("routes/agents.$agentId.index.tsx"),
     route("chat/:conversationId", "routes/agents.$agentId.chat.$conversationId.tsx"),

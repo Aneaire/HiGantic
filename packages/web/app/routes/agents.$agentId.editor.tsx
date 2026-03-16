@@ -103,7 +103,9 @@ function EditorView({
   const stopMessage = useMutation(api.messages.stop);
   const pastSessions = useQuery(api.creatorSessions.listByAgent, { agentId });
 
-  const [showHistory, setShowHistory] = useState(false);
+  const [showHistory, setShowHistory] = useState(
+    typeof window !== "undefined" && window.innerWidth >= 1024
+  );
   const [viewingConversationId, setViewingConversationId] =
     useState<Id<"conversations"> | null>(null);
 

@@ -78,11 +78,7 @@ export default defineSchema({
     agentId: v.id("agents"),
     title: v.string(),
     description: v.optional(v.string()),
-    status: v.union(
-      v.literal("todo"),
-      v.literal("in_progress"),
-      v.literal("done")
-    ),
+    status: v.string(),
     priority: v.optional(
       v.union(v.literal("low"), v.literal("medium"), v.literal("high"))
     ),
@@ -103,6 +99,7 @@ export default defineSchema({
     agentId: v.id("agents"),
     title: v.string(),
     content: v.string(),
+    tags: v.optional(v.array(v.string())),
     updatedAt: v.number(),
   })
     .index("by_tab", ["tabId"])
@@ -274,6 +271,7 @@ export default defineSchema({
       v.literal("completed"),
       v.literal("abandoned")
     ),
+    mode: v.optional(v.union(v.literal("create"), v.literal("edit"))),
     partialConfig: v.optional(v.any()),
     agentId: v.optional(v.id("agents")),
     conversationId: v.optional(v.id("conversations")),

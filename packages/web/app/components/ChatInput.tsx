@@ -1,16 +1,19 @@
 import { useState, useRef } from "react";
-import { Send, Square } from "lucide-react";
+import { Send, Square, MessageSquare } from "lucide-react";
 
 export function ChatInput({
   onSend,
   onStop,
   isProcessing,
+  hasActiveQuestions,
 }: {
   onSend: (content: string) => void;
   onStop?: () => void;
   isProcessing?: boolean;
+  hasActiveQuestions?: boolean;
 }) {
   const [value, setValue] = useState("");
+  const [showManualInput, setShowManualInput] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   function handleSubmit() {
@@ -18,6 +21,7 @@ export function ChatInput({
     if (!trimmed || isProcessing) return;
     onSend(trimmed);
     setValue("");
+    setShowManualInput(false);
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
@@ -35,6 +39,26 @@ export function ChatInput({
     const el = e.target;
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 200) + "px";
+  }
+
+  // When questions are active and user hasn't clicked "type own answer"
+  if (hasActiveQuestions && !showManualInput) {
+    return (
+      <div className="border-t border-zinc-800 p-4">
+        <div className="max-w-3xl mx-auto flex justify-center">
+          <button
+            onClick={() => {
+              setShowManualInput(true);
+              setTimeout(() => textareaRef.current?.focus(), 50);
+            }}
+            className="flex items-center gap-2 text-xs text-zinc-500 hover:text-zinc-300 px-4 py-2.5 rounded-xl border border-zinc-800 hover:border-zinc-600 bg-zinc-900/50 hover:bg-zinc-900 transition-all"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            Type your own answer
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

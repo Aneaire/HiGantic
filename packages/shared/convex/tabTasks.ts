@@ -29,11 +29,7 @@ export const list = query({
 export const listByStatus = query({
   args: {
     tabId: v.id("sidebarTabs"),
-    status: v.union(
-      v.literal("todo"),
-      v.literal("in_progress"),
-      v.literal("done")
-    ),
+    status: v.string(),
   },
   handler: async (ctx, args) => {
     await requireTabAccess(ctx, args.tabId);
@@ -52,13 +48,7 @@ export const create = mutation({
     tabId: v.id("sidebarTabs"),
     title: v.string(),
     description: v.optional(v.string()),
-    status: v.optional(
-      v.union(
-        v.literal("todo"),
-        v.literal("in_progress"),
-        v.literal("done")
-      )
-    ),
+    status: v.optional(v.string()),
     priority: v.optional(
       v.union(v.literal("low"), v.literal("medium"), v.literal("high"))
     ),
@@ -93,13 +83,7 @@ export const update = mutation({
     taskId: v.id("tabTasks"),
     title: v.optional(v.string()),
     description: v.optional(v.string()),
-    status: v.optional(
-      v.union(
-        v.literal("todo"),
-        v.literal("in_progress"),
-        v.literal("done")
-      )
-    ),
+    status: v.optional(v.string()),
     priority: v.optional(
       v.union(v.literal("low"), v.literal("medium"), v.literal("high"))
     ),

@@ -176,17 +176,23 @@ async function pollForJobs() {
 
       if (!claimed) continue;
 
-      // Check if this is a creator job (draft agent)
+      // Check if this is a creator/editor job
       const agent = await convex.query(api.agentApi.getAgent, {
         serverToken: SERVER_TOKEN,
         agentId: job.agentId,
       });
 
-      const isCreatorJob = agent?.status === "draft";
+      // Check for active creator/editor session on this conversation
+      const session = await convex.query(api.creatorApi.getSessionByConversation, {
+        serverToken: SERVER_TOKEN,
+        conversationId: job.conversationId,
+      });
+
+      const isCreatorJob = agent?.status === "draft" || session !== null;
       const runner = isCreatorJob ? runCreator : undefined;
 
       console.log(
-        `[server] Claimed job ${jobId} for ${isCreatorJob ? "creator" : "agent"} ${job.agentId}`
+        `[server] Claimed job ${jobId} for ${isCreatorJob ? (session?.mode === "edit" ? "editor" : "creator") : "agent"} ${job.agentId}`
       );
 
       processManager.submit(

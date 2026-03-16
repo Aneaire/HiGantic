@@ -13,7 +13,9 @@ import {
   Upload,
   Loader2,
   Image,
+  Wand2,
 } from "lucide-react";
+import { Link } from "react-router";
 import { useState, useEffect, useRef } from "react";
 import type { Doc } from "@agent-maker/shared/convex/_generated/dataModel";
 
@@ -45,9 +47,18 @@ export default function SettingsPage() {
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-2xl mx-auto px-6 py-8 space-y-8">
-        <div className="flex items-center gap-3">
-          <Settings className="h-5 w-5 text-zinc-400" />
-          <h1 className="text-lg font-semibold">Settings</h1>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Settings className="h-5 w-5 text-zinc-400" />
+            <h1 className="text-lg font-semibold">Settings</h1>
+          </div>
+          <Link
+            to={`/agents/${agent._id}/editor`}
+            className="flex items-center gap-2 rounded-xl bg-zinc-800 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-700 transition-colors"
+          >
+            <Wand2 className="h-4 w-4" />
+            Edit with AI
+          </Link>
         </div>
 
         <AgentIconSection agent={agent} />

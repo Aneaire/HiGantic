@@ -1,7 +1,8 @@
 import { useOutletContext, useNavigate } from "react-router";
 import { useMutation } from "convex/react";
 import { api } from "@agent-maker/shared/convex/_generated/api";
-import { Bot, MessageSquare, Brain, Settings } from "lucide-react";
+import { Bot, MessageSquare, Wand2 } from "lucide-react";
+import { Link } from "react-router";
 import type { Doc } from "@agent-maker/shared/convex/_generated/dataModel";
 
 export default function AgentIndexPage() {
@@ -40,6 +41,21 @@ export default function AgentIndexPage() {
               </div>
             </div>
           </button>
+
+          <Link
+            to={`/agents/${agent._id}/editor`}
+            className="flex items-center gap-4 rounded-xl border border-zinc-800 bg-zinc-900 p-4 hover:border-zinc-700 transition-colors text-left"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-zinc-300">
+              <Wand2 className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="font-medium">Edit with AI</div>
+              <div className="text-sm text-zinc-500">
+                Update config, pages, and API endpoints with AI
+              </div>
+            </div>
+          </Link>
         </div>
 
         <div className="mt-8 rounded-xl border border-zinc-800 bg-zinc-900 p-5 text-left">

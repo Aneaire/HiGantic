@@ -13,6 +13,13 @@ export const getAgentConfig = query({
     await requireServerAuth(ctx, args.serverToken);
     const agent = await ctx.db.get(args.agentId);
     if (!agent) return null;
+
+    // Include existing pages/tabs
+    const tabs = await ctx.db
+      .query("sidebarTabs")
+      .withIndex("by_agent", (q) => q.eq("agentId", args.agentId))
+      .collect();
+
     return {
       name: agent.name,
       description: agent.description,
@@ -21,6 +28,7 @@ export const getAgentConfig = query({
       enabledToolSets: agent.enabledToolSets,
       iconUrl: agent.iconUrl,
       status: agent.status,
+      pages: tabs.map((t) => ({ label: t.label, type: t.type, id: t._id })),
     };
   },
 });
@@ -40,6 +48,24 @@ export const getUserPlan = query({
       plan: user.plan,
       maxAgents: user.maxAgents,
     };
+  },
+});
+
+export const getSessionByConversation = query({
+  args: {
+    serverToken: v.string(),
+    conversationId: v.id("conversations"),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    const sessions = await ctx.db
+      .query("creatorSessions")
+      .collect();
+    const session = sessions.find(
+      (s) => s.conversationId === args.conversationId && s.status === "active"
+    );
+    if (!session) return null;
+    return { mode: session.mode ?? "create" };
   },
 });
 
@@ -92,8 +118,8 @@ export const updateAgentConfig = mutation({
     await requireServerAuth(ctx, args.serverToken);
 
     const agent = await ctx.db.get(args.agentId);
-    if (!agent || agent.status !== "draft") {
-      throw new Error("Draft agent not found");
+    if (!agent || (agent.status !== "draft" && agent.status !== "active")) {
+      throw new Error("Agent not found");
     }
 
     const { serverToken, agentId, ...updates } = args;
@@ -137,14 +163,16 @@ export const finalizeAgent = mutation({
     await requireServerAuth(ctx, args.serverToken);
 
     const agent = await ctx.db.get(args.agentId);
-    if (!agent || agent.status !== "draft") {
-      throw new Error("Draft agent not found");
+    if (!agent) {
+      throw new Error("Agent not found");
     }
 
-    // Set agent to active
-    await ctx.db.patch(args.agentId, { status: "active" });
+    // Set agent to active (only if draft — edit mode agents are already active)
+    if (agent.status === "draft") {
+      await ctx.db.patch(args.agentId, { status: "active" });
+    }
 
-    // Complete the creator session
+    // Complete the creator/editor session
     const sessions = await ctx.db
       .query("creatorSessions")
       .withIndex("by_agent", (q) => q.eq("agentId", args.agentId))

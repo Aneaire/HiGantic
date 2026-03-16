@@ -50,6 +50,7 @@ export const create = mutation({
     tabId: v.id("sidebarTabs"),
     title: v.string(),
     content: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const { tab } = await requireTabAccess(ctx, args.tabId);
@@ -58,6 +59,7 @@ export const create = mutation({
       agentId: tab.agentId,
       title: args.title,
       content: args.content ?? "",
+      tags: args.tags,
       updatedAt: Date.now(),
     });
   },
@@ -68,6 +70,7 @@ export const update = mutation({
     noteId: v.id("tabNotes"),
     title: v.optional(v.string()),
     content: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
   },
   handler: async (ctx, args) => {
     const note = await ctx.db.get(args.noteId);

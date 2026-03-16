@@ -21,6 +21,7 @@ import type * as memories from "../memories.js";
 import type * as messages from "../messages.js";
 import type * as serverAuth from "../serverAuth.js";
 import type * as sidebarTabs from "../sidebarTabs.js";
+import type * as storage from "../storage.js";
 import type * as tabApiEndpoints from "../tabApiEndpoints.js";
 import type * as tabNotes from "../tabNotes.js";
 import type * as tabSpreadsheet from "../tabSpreadsheet.js";
@@ -47,6 +48,7 @@ declare const fullApi: ApiFromModules<{
   messages: typeof messages;
   serverAuth: typeof serverAuth;
   sidebarTabs: typeof sidebarTabs;
+  storage: typeof storage;
   tabApiEndpoints: typeof tabApiEndpoints;
   tabNotes: typeof tabNotes;
   tabSpreadsheet: typeof tabSpreadsheet;

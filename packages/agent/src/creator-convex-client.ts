@@ -60,6 +60,64 @@ export class CreatorConvexClient {
     });
   }
 
+  async getSessionMode(conversationId: string): Promise<"create" | "edit"> {
+    const session = await this.client.query(api.creatorApi.getSessionByConversation, {
+      serverToken: this.serverToken,
+      conversationId: conversationId as any,
+    });
+    return (session?.mode as "create" | "edit") ?? "create";
+  }
+
+  async findTabByLabel(agentId: string, label: string): Promise<string | null> {
+    return this.client.query(api.agentApi.findTabByLabel, {
+      serverToken: this.serverToken,
+      agentId: agentId as any,
+      label,
+    });
+  }
+
+  async createApiEndpoint(
+    agentId: string,
+    tabId: string,
+    endpoint: {
+      name: string;
+      method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+      description?: string;
+      promptTemplate: string;
+      responseFormat?: "json" | "text";
+    }
+  ) {
+    return this.client.mutation(api.agentApi.createApiEndpoint, {
+      serverToken: this.serverToken,
+      agentId: agentId as any,
+      tabId: tabId as any,
+      name: endpoint.name,
+      method: endpoint.method,
+      description: endpoint.description,
+      promptTemplate: endpoint.promptTemplate,
+      responseFormat: endpoint.responseFormat,
+    });
+  }
+
+  async setSuggestions(messageId: string, suggestions: string[]) {
+    return this.client.mutation(api.agentApi.setSuggestions, {
+      serverToken: this.serverToken,
+      messageId: messageId as any,
+      suggestions,
+    });
+  }
+
+  async setQuestions(
+    messageId: string,
+    questions: Array<{ id: string; question: string; options: string[] }>
+  ) {
+    return this.client.mutation(api.agentApi.setQuestions, {
+      serverToken: this.serverToken,
+      messageId: messageId as any,
+      questions,
+    });
+  }
+
   // Reuse agentApi for message streaming
   async listMessages(conversationId: string) {
     return this.client.query(api.agentApi.listMessages, {

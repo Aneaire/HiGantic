@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bunx convex dev",
-    "deploy": "bunx convex deploy",
+    "dev": "bunx --env-file=../../.env convex dev --url https://robust-gnat-728.convex.cloud",
+    "deploy": "bunx --env-file=../../.env convex deploy",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

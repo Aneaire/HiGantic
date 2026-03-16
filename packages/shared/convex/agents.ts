@@ -64,6 +64,119 @@ export const create = mutation({
   },
 });
 
+export const createFromTemplate = mutation({
+  args: {
+    name: v.string(),
+    description: v.string(),
+    systemPrompt: v.string(),
+    model: v.string(),
+    enabledToolSets: v.array(v.string()),
+    starterPages: v.optional(
+      v.array(v.object({ label: v.string(), type: v.string() }))
+    ),
+    starterEndpoints: v.optional(
+      v.array(
+        v.object({
+          tabLabel: v.string(),
+          name: v.string(),
+          method: v.string(),
+          description: v.optional(v.string()),
+          promptTemplate: v.string(),
+          responseFormat: v.optional(v.string()),
+        })
+      )
+    ),
+  },
+  handler: async (ctx, args) => {
+    const user = await getOrCreateAuthUser(ctx);
+
+    // Check plan limits
+    const existingAgents = await ctx.db
+      .query("agents")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+
+    if (existingAgents.length >= user.maxAgents) {
+      throw new Error(
+        `Agent limit reached (${user.maxAgents}). Upgrade your plan to create more agents.`
+      );
+    }
+
+    const slug = args.name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+
+    const agentId = await ctx.db.insert("agents", {
+      userId: user._id,
+      name: args.name,
+      slug,
+      description: args.description,
+      systemPrompt: args.systemPrompt,
+      model: args.model,
+      enabledToolSets: args.enabledToolSets,
+      status: "active",
+    });
+
+    // Create starter pages
+    const tabMap: Record<string, any> = {};
+    if (args.starterPages) {
+      // Check plan for page types
+      const plan = (user.plan ?? "free") as "free" | "pro" | "enterprise";
+      const allowedFree = ["tasks", "notes", "markdown", "data_table"];
+      const allowedPro = [...allowedFree, "spreadsheet", "postgres", "api"];
+      const allowed = plan === "free" ? allowedFree : allowedPro;
+
+      let sortOrder = 0;
+      for (const page of args.starterPages) {
+        if (!allowed.includes(page.type)) continue;
+
+        const pageSlug = page.label
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "");
+
+        const tabId = await ctx.db.insert("sidebarTabs", {
+          agentId,
+          label: page.label.substring(0, 100),
+          slug: pageSlug,
+          type: page.type as any,
+          sortOrder: sortOrder++,
+        });
+
+        tabMap[page.label] = tabId;
+      }
+    }
+
+    // Create starter API endpoints
+    if (args.starterEndpoints) {
+      for (const ep of args.starterEndpoints) {
+        const tabId = tabMap[ep.tabLabel];
+        if (!tabId) continue;
+
+        const epSlug = ep.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-|-$/g, "");
+
+        await ctx.db.insert("tabApiEndpoints", {
+          tabId,
+          agentId,
+          name: ep.name.substring(0, 100),
+          slug: epSlug,
+          method: ep.method as any,
+          description: ep.description?.substring(0, 500),
+          promptTemplate: ep.promptTemplate.substring(0, 5000),
+          responseFormat: (ep.responseFormat ?? "json") as any,
+          isActive: true,
+        });
+      }
+    }
+
+    return agentId;
+  },
+});
+
 export const setIcon = mutation({
   args: {
     agentId: v.id("agents"),

@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 import { resolve } from "node:path";
 
 export default defineConfig({
+  envDir: resolve(import.meta.dirname, "../.."),
   plugins: [tailwindcss(), reactRouter()],
   resolve: {
     alias: {
