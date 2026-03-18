@@ -23,6 +23,7 @@ import type * as conversations from "../conversations.js";
 import type * as creatorApi from "../creatorApi.js";
 import type * as creatorSessions from "../creatorSessions.js";
 import type * as customTools from "../customTools.js";
+import type * as dispatch from "../dispatch.js";
 import type * as documentChunksInternal from "../documentChunksInternal.js";
 import type * as documents from "../documents.js";
 import type * as memories from "../memories.js";
@@ -61,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   creatorApi: typeof creatorApi;
   creatorSessions: typeof creatorSessions;
   customTools: typeof customTools;
+  dispatch: typeof dispatch;
   documentChunksInternal: typeof documentChunksInternal;
   documents: typeof documents;
   memories: typeof memories;

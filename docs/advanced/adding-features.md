@@ -46,11 +46,10 @@ The system prompt is **dynamically assembled** — each section only appears if 
 - **Gemini tools** are registered separately in `gemini-tools.ts` (native function declarations, not MCP)
 - **Allowed tools**: Claude SDK requires an explicit allowlist. `buildAllowedTools()` mirrors the MCP registration — every tool registered in `buildMcpServer()` must also be listed in `buildAllowedTools()` with its `mcp__agent-tools__<name>` prefix.
 
-## Server-Side Executors (`server.ts`)
+## Dispatch System (`dispatch.ts` + `server.ts`)
 
-Three polling loops run independently:
-- **Jobs**: every 2s — agent conversation runs
-- **Schedules**: every 10s — cron/interval scheduled actions
-- **Timers**: every 5s — delayed one-time actions
+Primary dispatch is **push-based** via Convex scheduler. When jobs/timers/schedules are created, a Convex action immediately notifies the agent server via HTTP endpoints (`/dispatch/job`, `/dispatch/timer`, `/dispatch/schedule`).
+
+A **fallback poll** runs every 30s to catch missed dispatches. The agent server's `executeScheduleAction()` and `executeTimerAction()` functions handle the actual execution — used by both dispatch endpoints and fallback polls.
 
 Both schedules and timers can execute: `send_email`, `create_task`, `fire_webhook`, `run_prompt`, `send_message`.

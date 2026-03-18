@@ -2,6 +2,7 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { requireAuthUser } from "./auth";
 import { requireServerAuth } from "./serverAuth";
+import { internal } from "./_generated/api";
 
 // ── Cron expression parser (basic) ──────────────────────────────────
 
@@ -78,7 +79,7 @@ export const create = mutation({
     const now = Date.now();
     const nextRunAt = computeNextRun(args.schedule, args.scheduleType, now);
 
-    return await ctx.db.insert("scheduledActions", {
+    const actionId = await ctx.db.insert("scheduledActions", {
       agentId: args.agentId,
       name: args.name.substring(0, 200),
       description: args.description?.substring(0, 1000),
@@ -92,6 +93,14 @@ export const create = mutation({
       maxRuns: args.maxRuns,
       createdAt: now,
     });
+
+    // Schedule dispatch at nextRunAt
+    const delayMs = Math.max(0, nextRunAt - now);
+    await ctx.scheduler.runAfter(delayMs, internal.dispatch.fireSchedule, {
+      actionId,
+    });
+
+    return actionId;
   },
 });
 
@@ -105,9 +114,16 @@ export const toggle = mutation({
     if (!agent || agent.userId !== user._id) throw new Error("Not authorized");
 
     const newStatus = action.status === "active" ? "paused" : "active";
+    const now = Date.now();
     const patch: Record<string, any> = { status: newStatus };
     if (newStatus === "active") {
-      patch.nextRunAt = computeNextRun(action.schedule, action.scheduleType, Date.now());
+      const nextRunAt = computeNextRun(action.schedule, action.scheduleType, now);
+      patch.nextRunAt = nextRunAt;
+      // Schedule dispatch for resumed schedule
+      const delayMs = Math.max(0, nextRunAt - now);
+      await ctx.scheduler.runAfter(delayMs, internal.dispatch.fireSchedule, {
+        actionId: args.actionId,
+      });
     }
     await ctx.db.patch(args.actionId, patch);
   },
@@ -204,12 +220,22 @@ export const completeRun = mutation({
     const isComplete = action.scheduleType === "once" ||
       (action.maxRuns !== undefined && newRunCount >= action.maxRuns);
 
+    const nextRunAt = isComplete ? undefined : computeNextRun(action.schedule, action.scheduleType, now);
+
     await ctx.db.patch(args.actionId, {
       lastRunAt: now,
       runCount: newRunCount,
       status: isComplete ? "completed" : action.status,
-      nextRunAt: isComplete ? undefined : computeNextRun(action.schedule, action.scheduleType, now),
+      nextRunAt,
     });
+
+    // Schedule next dispatch if not complete
+    if (!isComplete && nextRunAt) {
+      const delayMs = Math.max(0, nextRunAt - now);
+      await ctx.scheduler.runAfter(delayMs, internal.dispatch.fireSchedule, {
+        actionId: args.actionId,
+      });
+    }
   },
 });
 
@@ -245,7 +271,9 @@ export const createFromAgent = mutation({
     if (existing.length >= 20) throw new Error("Maximum 20 scheduled actions per agent");
 
     const now = Date.now();
-    return await ctx.db.insert("scheduledActions", {
+    const nextRunAt = computeNextRun(args.schedule, args.scheduleType, now);
+
+    const actionId = await ctx.db.insert("scheduledActions", {
       agentId: args.agentId,
       name: args.name.substring(0, 200),
       description: args.description?.substring(0, 1000),
@@ -253,11 +281,19 @@ export const createFromAgent = mutation({
       scheduleType: args.scheduleType,
       action: args.action,
       status: "active",
-      nextRunAt: computeNextRun(args.schedule, args.scheduleType, now),
+      nextRunAt,
       runCount: 0,
       maxRuns: args.maxRuns,
       createdAt: now,
     });
+
+    // Schedule dispatch at nextRunAt
+    const delayMs = Math.max(0, nextRunAt - now);
+    await ctx.scheduler.runAfter(delayMs, internal.dispatch.fireSchedule, {
+      actionId,
+    });
+
+    return actionId;
   },
 });
 
@@ -297,9 +333,17 @@ export const resumeFromAgent = mutation({
     await requireServerAuth(ctx, args.serverToken);
     const action = await ctx.db.get(args.actionId);
     if (!action) throw new Error("Scheduled action not found");
+    const now = Date.now();
+    const nextRunAt = computeNextRun(action.schedule, action.scheduleType, now);
     await ctx.db.patch(args.actionId, {
       status: "active",
-      nextRunAt: computeNextRun(action.schedule, action.scheduleType, Date.now()),
+      nextRunAt,
+    });
+
+    // Schedule dispatch for resumed schedule
+    const delayMs = Math.max(0, nextRunAt - now);
+    await ctx.scheduler.runAfter(delayMs, internal.dispatch.fireSchedule, {
+      actionId: args.actionId,
     });
   },
 });

@@ -314,8 +314,8 @@ export function buildSystemPrompt(
   // ── Custom tools guidance (only if enabled) ─────────────────────────
   const customToolGuidance = has(enabled, "custom_http_tools")
     ? `
-## When You Can't Do Something
-If the user asks you to do something you don't have the tools for (e.g. send an email, connect to a specific API, access a database), do the following:
+## Custom HTTP Tools
+If the user asks you to do something you don't have a built-in tool for (e.g. connect to a specific API, access a database), do the following:
 
 1. Explain what you can't do and why
 2. **Generate a ready-to-paste tool configuration** the user can add in Settings > Custom HTTP Tools:
@@ -331,7 +331,44 @@ Tell them: *"Go to your agent's Settings page, scroll to Custom HTTP Tools, and 
 `
     : "";
 
-  return `${agentConfig.systemPrompt}${conversationHistory}${memorySection}${tabSection}${knowledgeBaseSection}${customToolSection}${schedulesSection}${automationsSection}${capabilitiesSection}${autonomySection}${scheduleGuidance}${automationGuidance}${agentMessageGuidance}${notionGuidance}${slackGuidance}${gcalGuidance}${gdriveGuidance}${gsheetsGuidance}${imageGenGuidance}${customToolGuidance}
+  // ── Available integrations (show what's NOT enabled yet) ────────────
+  const allIntegrations: Record<string, { label: string; description: string }> = {
+    memory: { label: "Memory", description: "Store and recall information across conversations" },
+    web_search: { label: "Web Search", description: "Search the internet and fetch web pages" },
+    pages: { label: "Pages", description: "Create and manage task boards, notes, spreadsheets, and markdown pages" },
+    rag: { label: "Knowledge Base", description: "Upload documents and search them for answers" },
+    email: { label: "Email", description: "Send emails to users and contacts" },
+    custom_http_tools: { label: "Custom HTTP Tools", description: "Call external APIs with custom configurations" },
+    schedules: { label: "Scheduled Actions", description: "Create recurring or one-time scheduled tasks" },
+    automations: { label: "Automations", description: "Event-driven rules: when X happens → do Y" },
+    timers: { label: "Timers & Delays", description: "Set delayed actions for follow-ups and reminders" },
+    webhooks: { label: "Webhooks", description: "Fire outgoing webhooks to external services" },
+    agent_messages: { label: "Inter-Agent Messaging", description: "Communicate with other agents for delegation" },
+    notion: { label: "Notion", description: "Search, read, create, and update Notion pages and databases" },
+    slack: { label: "Slack", description: "Send messages, read channels, and search in Slack" },
+    google_calendar: { label: "Google Calendar", description: "Schedule meetings, check availability, manage events" },
+    google_drive: { label: "Google Drive", description: "Search, read, create, and manage files in Google Drive" },
+    google_sheets: { label: "Google Sheets", description: "Read, write, and manage spreadsheet data" },
+    image_generation: { label: "Image Generation", description: "Generate images from text prompts using AI" },
+  };
+
+  const disabledIntegrations = Object.entries(allIntegrations)
+    .filter(([key]) => !has(enabled, key))
+    .map(([, info]) => `- **${info.label}** — ${info.description}`);
+
+  const availableIntegrationsSection = disabledIntegrations.length > 0
+    ? `
+## Available Integrations (Not Yet Enabled)
+The following integrations are available but not currently enabled for you. If the user asks about any of these capabilities, let them know it's available and they can enable it:
+
+${disabledIntegrations.join("\n")}
+
+To enable these, tell the user: *"This integration is available! You can enable it in the **Settings** page of the Agent Maker dashboard under **Tool Sets**."*
+If the user wants more details, point them to the documentation page in the Agent Maker dashboard.
+`
+    : "";
+
+  return `${agentConfig.systemPrompt}${conversationHistory}${memorySection}${tabSection}${knowledgeBaseSection}${customToolSection}${schedulesSection}${automationsSection}${capabilitiesSection}${autonomySection}${scheduleGuidance}${automationGuidance}${agentMessageGuidance}${notionGuidance}${slackGuidance}${gcalGuidance}${gdriveGuidance}${gsheetsGuidance}${imageGenGuidance}${customToolGuidance}${availableIntegrationsSection}
 ## Interactive Questions
 When you need the user to choose between options (onboarding, preferences, configuration), use the \`ask_questions\` tool INSTEAD of writing numbered questions in plain text. This renders clickable option cards the user can select from. Do NOT duplicate the questions in your text — the tool handles display. Use this whenever you'd otherwise write "do you want A, B, or C?"
 

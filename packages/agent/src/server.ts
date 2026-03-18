@@ -13,7 +13,8 @@ import { existsSync, mkdirSync } from "fs";
 
 const CONVEX_URL = process.env.CONVEX_URL!;
 const SERVER_TOKEN = process.env.AGENT_SERVER_TOKEN!;
-const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS ?? "2000", 10);
+// Fallback poll interval — primary dispatch is push-based via Convex scheduler
+const POLL_INTERVAL_MS = parseInt(process.env.POLL_INTERVAL_MS ?? "30000", 10);
 
 if (!CONVEX_URL) throw new Error("CONVEX_URL environment variable is required");
 if (!SERVER_TOKEN) throw new Error("AGENT_SERVER_TOKEN environment variable is required");
@@ -70,6 +71,121 @@ app.post("/trigger", async (c) => {
   });
 
   return c.json({ ok: true, queued });
+});
+
+// ── Push-based dispatch endpoints ────────────────────────────────────
+// Called by Convex scheduled actions for instant dispatch (replaces polling)
+
+function verifyDispatchAuth(c: any): boolean {
+  const auth = c.req.header("Authorization");
+  return auth === `Bearer ${SERVER_TOKEN}`;
+}
+
+// Job dispatch: Convex calls this immediately when a job is created
+app.post("/dispatch/job", async (c) => {
+  if (!verifyDispatchAuth(c)) return c.json({ error: "Unauthorized" }, 401);
+  const { jobId } = await c.req.json<{ jobId: string }>();
+
+  try {
+    // Load the job
+    const job = await convex.query(api.agentJobs.get, {
+      jobId: jobId as any,
+    });
+    if (!job || job.status !== "pending") {
+      return c.json({ ok: true, skipped: true });
+    }
+
+    // Claim atomically
+    const claimed = await convex.mutation(api.agentJobs.claim, {
+      jobId: jobId as any,
+      workerId: `worker-${process.pid}`,
+    });
+    if (!claimed) return c.json({ ok: true, skipped: true });
+
+    // Determine runner type
+    const agent = await convex.query(api.agentApi.getAgent, {
+      serverToken: SERVER_TOKEN,
+      agentId: job.agentId,
+    });
+    const session = await convex.query(api.creatorApi.getSessionByConversation, {
+      serverToken: SERVER_TOKEN,
+      conversationId: job.conversationId,
+    });
+    const isCreatorJob = agent?.status === "draft" || session !== null;
+    const runner = isCreatorJob ? runCreator : undefined;
+
+    console.log(
+      `[dispatch] Job ${jobId} dispatched for ${isCreatorJob ? "creator" : "agent"} ${job.agentId}`
+    );
+
+    processManager.submit(
+      jobId,
+      {
+        agentId: job.agentId,
+        conversationId: job.conversationId,
+        assistantMessageId: job.messageId,
+        convexUrl: CONVEX_URL,
+        serverToken: SERVER_TOKEN,
+      },
+      runner
+    );
+
+    return c.json({ ok: true });
+  } catch (err: any) {
+    console.error(`[dispatch] Job dispatch error:`, err.message);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// Timer dispatch: Convex calls this at the exact fireAt time
+app.post("/dispatch/timer", async (c) => {
+  if (!verifyDispatchAuth(c)) return c.json({ error: "Unauthorized" }, 401);
+  const { timerId } = await c.req.json<{ timerId: string }>();
+
+  try {
+    // Mark as fired atomically
+    const firedTimer = await convex.mutation(api.agentTimers.markFired, {
+      serverToken: SERVER_TOKEN,
+      timerId: timerId as any,
+    });
+    if (!firedTimer) return c.json({ ok: true, skipped: true });
+
+    const convexClient = new AgentConvexClient(CONVEX_URL, SERVER_TOKEN);
+    console.log(`[dispatch] Timer "${firedTimer.label}" (${timerId}) firing`);
+
+    // Execute — reuse the same logic as the polling executor
+    await executeTimerAction(convexClient, firedTimer);
+
+    return c.json({ ok: true });
+  } catch (err: any) {
+    console.error(`[dispatch] Timer dispatch error:`, err.message);
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+// Schedule dispatch: Convex calls this at the exact nextRunAt time
+app.post("/dispatch/schedule", async (c) => {
+  if (!verifyDispatchAuth(c)) return c.json({ error: "Unauthorized" }, 401);
+  const { actionId } = await c.req.json<{ actionId: string }>();
+
+  try {
+    // Mark as running
+    const result = await convex.mutation(api.scheduledActions.markRunning, {
+      serverToken: SERVER_TOKEN,
+      actionId: actionId as any,
+    });
+    if (!result) return c.json({ ok: true, skipped: true });
+
+    console.log(`[dispatch] Schedule "${result.action.name}" (${actionId}) firing`);
+
+    // Execute — reuse the same logic as the polling executor
+    await executeScheduleAction(result.runId, actionId, result.action);
+
+    return c.json({ ok: true });
+  } catch (err: any) {
+    console.error(`[dispatch] Schedule dispatch error:`, err.message);
+    return c.json({ error: err.message }, 500);
+  }
 });
 
 // ── REST API endpoints (user-defined agent APIs) ─────────────────────
@@ -422,7 +538,175 @@ async function fireOutgoingWebhooks(
   }
 }
 
-// ── Scheduled Actions executor ──────────────────────────────────────
+// ── Single-action executors (used by both dispatch endpoints and fallback polls)
+
+async function executeScheduleAction(runId: string, actionId: string, action: any) {
+  const convexClient = new AgentConvexClient(CONVEX_URL, SERVER_TOKEN);
+  let success = true;
+  let actionResult = "";
+  let actionError: string | undefined;
+
+  try {
+    switch (action.action.type) {
+      case "run_prompt": {
+        const config = action.action.config;
+        actionResult = `Prompt scheduled: ${config.prompt?.substring(0, 100) ?? "N/A"}`;
+        break;
+      }
+      case "send_email": {
+        const { to, subject, body } = action.action.config;
+        const emailConfig = await convexClient.getToolConfig(action.agentId, "email");
+        if (emailConfig && (emailConfig as any).resendApiKey) {
+          const ec = emailConfig as any;
+          const res = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${ec.resendApiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              from: ec.fromName ? `${ec.fromName} <${ec.fromEmail}>` : ec.fromEmail,
+              to: Array.isArray(to) ? to : [to],
+              subject,
+              html: body,
+            }),
+          });
+          if (!res.ok) throw new Error(`Resend API error: ${res.status}`);
+          await convexClient.logEmail(action.agentId, {
+            to: Array.isArray(to) ? to : [to],
+            subject,
+            status: "sent",
+          });
+          actionResult = `Email sent to ${to}`;
+        } else {
+          throw new Error("Email not configured for this agent");
+        }
+        break;
+      }
+      case "create_task": {
+        const { tabId, title, description, status, priority } = action.action.config;
+        await convexClient.createTask(tabId, action.agentId, {
+          title, description, status, priority,
+        });
+        actionResult = `Task "${title}" created`;
+        break;
+      }
+      case "fire_webhook": {
+        const { url, payload } = action.action.config;
+        await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event: "schedule.fired",
+            timestamp: new Date().toISOString(),
+            agentId: action.agentId,
+            scheduleName: action.name,
+            data: payload,
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+        actionResult = `Webhook fired to ${url}`;
+        break;
+      }
+      default:
+        actionResult = `Unknown action type: ${action.action.type}`;
+    }
+  } catch (err: any) {
+    success = false;
+    actionError = err.message;
+    console.error(`[schedule] Action failed:`, err.message);
+  }
+
+  await convexClient.emitEvent(action.agentId, "schedule.fired", "scheduler", {
+    actionId,
+    actionName: action.name,
+    success,
+    result: actionResult,
+    error: actionError,
+  });
+
+  await convex.mutation(api.scheduledActions.completeRun, {
+    serverToken: SERVER_TOKEN,
+    runId: runId as any,
+    actionId: actionId as any,
+    success,
+    result: actionResult,
+    error: actionError,
+  });
+
+  console.log(`[schedule] Action "${action.name}" ${success ? "completed" : "failed"}`);
+}
+
+async function executeTimerAction(convexClient: AgentConvexClient, timer: any) {
+  try {
+    switch (timer.action.type) {
+      case "send_email": {
+        const { to, subject, body } = timer.action.config;
+        const emailConfig = await convexClient.getToolConfig(timer.agentId, "email");
+        if (emailConfig && (emailConfig as any).resendApiKey) {
+          const ec = emailConfig as any;
+          await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${ec.resendApiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              from: ec.fromName ? `${ec.fromName} <${ec.fromEmail}>` : ec.fromEmail,
+              to: Array.isArray(to) ? to : [to],
+              subject,
+              html: body,
+            }),
+          });
+          await convexClient.logEmail(timer.agentId, {
+            to: Array.isArray(to) ? to : [to],
+            subject,
+            status: "sent",
+          });
+        }
+        break;
+      }
+      case "create_task": {
+        const { tabId, title, description, status, priority } = timer.action.config;
+        await convexClient.createTask(tabId, timer.agentId, {
+          title, description, status, priority,
+        });
+        break;
+      }
+      case "fire_webhook": {
+        const { url, payload } = timer.action.config;
+        await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event: "timer.fired",
+            timestamp: new Date().toISOString(),
+            agentId: timer.agentId,
+            timerLabel: timer.label,
+            data: payload,
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+        break;
+      }
+      case "send_message":
+      case "run_prompt":
+        break;
+    }
+
+    await convexClient.emitEvent(timer.agentId, "timer.fired", "timer", {
+      timerId: timer._id,
+      label: timer.label,
+      actionType: timer.action.type,
+    });
+
+    console.log(`[timer] Timer "${timer.label}" fired successfully`);
+  } catch (err: any) {
+    console.error(`[timer] Failed to fire timer ${timer._id}:`, err.message);
+  }
+}
+
+// ── Fallback polling (safety net — primary dispatch is push-based) ──
 
 async function executeScheduledActions() {
   try {
@@ -434,128 +718,23 @@ async function executeScheduledActions() {
 
     for (const action of dueActions) {
       try {
-        // Mark as running and get run ID
         const result = await convex.mutation(api.scheduledActions.markRunning, {
           serverToken: SERVER_TOKEN,
           actionId: action._id,
         });
         if (!result) continue;
-
-        const { runId } = result;
-        const convexClient = new AgentConvexClient(CONVEX_URL, SERVER_TOKEN);
-
-        console.log(`[cron] Executing scheduled action "${action.name}" (${action._id})`);
-
-        // Execute the action based on type
-        let success = true;
-        let actionResult = "";
-        let actionError: string | undefined;
-
-        try {
-          switch (action.action.type) {
-            case "run_prompt": {
-              // Create a conversation and job for the agent
-              const config = action.action.config;
-              actionResult = `Prompt scheduled: ${config.prompt?.substring(0, 100) ?? "N/A"}`;
-              break;
-            }
-            case "send_email": {
-              const { to, subject, body } = action.action.config;
-              // Get email config for the agent
-              const emailConfig = await convexClient.getToolConfig(action.agentId, "email");
-              if (emailConfig && (emailConfig as any).resendApiKey) {
-                const ec = emailConfig as any;
-                const res = await fetch("https://api.resend.com/emails", {
-                  method: "POST",
-                  headers: {
-                    Authorization: `Bearer ${ec.resendApiKey}`,
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    from: ec.fromName ? `${ec.fromName} <${ec.fromEmail}>` : ec.fromEmail,
-                    to: Array.isArray(to) ? to : [to],
-                    subject,
-                    html: body,
-                  }),
-                });
-                if (!res.ok) throw new Error(`Resend API error: ${res.status}`);
-                await convexClient.logEmail(action.agentId, {
-                  to: Array.isArray(to) ? to : [to],
-                  subject,
-                  status: "sent",
-                });
-                actionResult = `Email sent to ${to}`;
-              } else {
-                throw new Error("Email not configured for this agent");
-              }
-              break;
-            }
-            case "create_task": {
-              const { tabId, title, description, status, priority } = action.action.config;
-              await convexClient.createTask(tabId, action.agentId, {
-                title, description, status, priority,
-              });
-              actionResult = `Task "${title}" created`;
-              break;
-            }
-            case "fire_webhook": {
-              const { url, payload } = action.action.config;
-              await fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  event: "schedule.fired",
-                  timestamp: new Date().toISOString(),
-                  agentId: action.agentId,
-                  scheduleName: action.name,
-                  data: payload,
-                }),
-                signal: AbortSignal.timeout(15000),
-              });
-              actionResult = `Webhook fired to ${url}`;
-              break;
-            }
-            default:
-              actionResult = `Unknown action type: ${action.action.type}`;
-          }
-        } catch (err: any) {
-          success = false;
-          actionError = err.message;
-          console.error(`[cron] Action failed:`, err.message);
-        }
-
-        // Emit event
-        await convexClient.emitEvent(action.agentId, "schedule.fired", "scheduler", {
-          actionId: action._id,
-          actionName: action.name,
-          success,
-          result: actionResult,
-          error: actionError,
-        });
-
-        // Complete the run
-        await convex.mutation(api.scheduledActions.completeRun, {
-          serverToken: SERVER_TOKEN,
-          runId,
-          actionId: action._id,
-          success,
-          result: actionResult,
-          error: actionError,
-        });
-
-        console.log(`[cron] Action "${action.name}" ${success ? "completed" : "failed"}`);
+        console.log(`[fallback] Executing missed schedule "${action.name}" (${action._id})`);
+        await executeScheduleAction(result.runId, action._id, result.action);
       } catch (err: any) {
-        console.error(`[cron] Failed to execute action ${action._id}:`, err.message);
+        console.error(`[fallback] Schedule ${action._id}:`, err.message);
       }
     }
   } catch (err: any) {
     if (!err.message?.includes("Could not find")) {
-      console.error("[cron] Schedule poll error:", err.message);
+      console.error("[fallback] Schedule poll error:", err.message);
     }
   }
 }
-
-// ── Timer executor ──────────────────────────────────────────────────
 
 async function executeTimers() {
   try {
@@ -567,87 +746,21 @@ async function executeTimers() {
 
     for (const timer of dueTimers) {
       try {
-        // Mark as fired atomically
         const firedTimer = await convex.mutation(api.agentTimers.markFired, {
           serverToken: SERVER_TOKEN,
           timerId: timer._id,
         });
         if (!firedTimer) continue;
-
+        console.log(`[fallback] Firing missed timer "${timer.label}" (${timer._id})`);
         const convexClient = new AgentConvexClient(CONVEX_URL, SERVER_TOKEN);
-        console.log(`[timer] Firing timer "${timer.label}" (${timer._id})`);
-
-        switch (timer.action.type) {
-          case "send_email": {
-            const { to, subject, body } = timer.action.config;
-            const emailConfig = await convexClient.getToolConfig(timer.agentId, "email");
-            if (emailConfig && (emailConfig as any).resendApiKey) {
-              const ec = emailConfig as any;
-              await fetch("https://api.resend.com/emails", {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${ec.resendApiKey}`,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  from: ec.fromName ? `${ec.fromName} <${ec.fromEmail}>` : ec.fromEmail,
-                  to: Array.isArray(to) ? to : [to],
-                  subject,
-                  html: body,
-                }),
-              });
-              await convexClient.logEmail(timer.agentId, {
-                to: Array.isArray(to) ? to : [to],
-                subject,
-                status: "sent",
-              });
-            }
-            break;
-          }
-          case "create_task": {
-            const { tabId, title, description, status, priority } = timer.action.config;
-            await convexClient.createTask(tabId, timer.agentId, {
-              title, description, status, priority,
-            });
-            break;
-          }
-          case "fire_webhook": {
-            const { url, payload } = timer.action.config;
-            await fetch(url, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                event: "timer.fired",
-                timestamp: new Date().toISOString(),
-                agentId: timer.agentId,
-                timerLabel: timer.label,
-                data: payload,
-              }),
-              signal: AbortSignal.timeout(15000),
-            });
-            break;
-          }
-          case "send_message":
-          case "run_prompt":
-            // These would create a conversation/job — mark as done for now
-            break;
-        }
-
-        // Emit event
-        await convexClient.emitEvent(timer.agentId, "timer.fired", "timer", {
-          timerId: timer._id,
-          label: timer.label,
-          actionType: timer.action.type,
-        });
-
-        console.log(`[timer] Timer "${timer.label}" fired successfully`);
+        await executeTimerAction(convexClient, firedTimer);
       } catch (err: any) {
-        console.error(`[timer] Failed to fire timer ${timer._id}:`, err.message);
+        console.error(`[fallback] Timer ${timer._id}:`, err.message);
       }
     }
   } catch (err: any) {
     if (!err.message?.includes("Could not find")) {
-      console.error("[timer] Timer poll error:", err.message);
+      console.error("[fallback] Timer poll error:", err.message);
     }
   }
 }
@@ -823,18 +936,12 @@ async function pollForJobs() {
   }
 }
 
-setInterval(pollForJobs, POLL_INTERVAL_MS);
-console.log(`[server] Polling for jobs every ${POLL_INTERVAL_MS}ms`);
-
-// Poll for scheduled actions every 10 seconds
-const SCHEDULE_POLL_MS = parseInt(process.env.SCHEDULE_POLL_MS ?? "10000", 10);
-setInterval(executeScheduledActions, SCHEDULE_POLL_MS);
-console.log(`[server] Polling for scheduled actions every ${SCHEDULE_POLL_MS}ms`);
-
-// Poll for timers every 5 seconds
-const TIMER_POLL_MS = parseInt(process.env.TIMER_POLL_MS ?? "5000", 10);
-setInterval(executeTimers, TIMER_POLL_MS);
-console.log(`[server] Polling for timers every ${TIMER_POLL_MS}ms`);
+// Fallback polls — catch anything the push-based dispatch might miss
+const FALLBACK_POLL_MS = POLL_INTERVAL_MS; // default 30s
+setInterval(pollForJobs, FALLBACK_POLL_MS);
+setInterval(executeScheduledActions, FALLBACK_POLL_MS);
+setInterval(executeTimers, FALLBACK_POLL_MS);
+console.log(`[server] Push-based dispatch active. Fallback poll every ${FALLBACK_POLL_MS / 1000}s`);
 
 // ── Start server ─────────────────────────────────────────────────────
 

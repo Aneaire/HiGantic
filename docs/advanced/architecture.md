@@ -148,13 +148,19 @@ Tools are also gated at the SDK level via `buildAllowedTools()`, which returns t
 ### Creator
 - `creatorSessions` — Agent creation/editing sessions
 
-## Polling Intervals
+## Dispatch System
 
-| Poller | Interval | What It Does |
-|--------|----------|-------------|
-| Job poller | 2 seconds | Claims and executes pending agent jobs |
-| Schedule poller | 10 seconds | Fires due scheduled actions |
-| Timer poller | 5 seconds | Fires due timers |
+Primary dispatch is **push-based** via Convex's built-in scheduler (`ctx.scheduler`). When a job, timer, or schedule is created, a Convex action is scheduled that immediately notifies the agent server via HTTP.
+
+| Trigger | Dispatch Method | Latency |
+|---------|----------------|---------|
+| Job created | `ctx.scheduler.runAfter(0, ...)` → `POST /dispatch/job` | Sub-second |
+| Timer created | `ctx.scheduler.runAfter(delayMs, ...)` → `POST /dispatch/timer` | Exact time |
+| Schedule due | `ctx.scheduler.runAfter(delayMs, ...)` → `POST /dispatch/schedule` | Exact time |
+
+A **fallback poll** runs every 30s (configurable via `POLL_INTERVAL_MS`) to catch any missed dispatches. This is a safety net, not the primary mechanism.
+
+The dispatch module lives in `packages/shared/convex/dispatch.ts` with three internal actions: `notifyJobCreated`, `fireTimer`, `fireSchedule`.
 
 ## Auth Model
 

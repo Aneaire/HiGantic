@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getOrCreateAuthUser, requireAuthUser } from "./auth";
+import { internal } from "./_generated/api";
 
 export const start = mutation({
   handler: async (ctx) => {
@@ -111,12 +112,16 @@ export const start = mutation({
       status: "pending",
     });
 
-    await ctx.db.insert("agentJobs", {
+    const jobId = await ctx.db.insert("agentJobs", {
       agentId,
       conversationId,
       messageId: assistantMessageId,
       userId: user._id,
       status: "pending",
+    });
+
+    await ctx.scheduler.runAfter(0, internal.dispatch.notifyJobCreated, {
+      jobId,
     });
 
     return { sessionId, agentId, conversationId };
@@ -197,12 +202,16 @@ export const startEdit = mutation({
       status: "pending",
     });
 
-    await ctx.db.insert("agentJobs", {
+    const jobId = await ctx.db.insert("agentJobs", {
       agentId: args.agentId,
       conversationId,
       messageId: assistantMessageId,
       userId: user._id,
       status: "pending",
+    });
+
+    await ctx.scheduler.runAfter(0, internal.dispatch.notifyJobCreated, {
+      jobId,
     });
 
     return { sessionId, agentId: args.agentId, conversationId };

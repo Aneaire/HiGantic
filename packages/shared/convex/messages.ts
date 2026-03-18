@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { requireAuthUser } from "./auth";
+import { internal } from "./_generated/api";
 
 export const list = query({
   args: { conversationId: v.id("conversations") },
@@ -77,12 +78,17 @@ export const send = mutation({
     const agent = await ctx.db.get(conv.agentId);
     if (!agent) throw new Error("Agent not found");
 
-    await ctx.db.insert("agentJobs", {
+    const jobId = await ctx.db.insert("agentJobs", {
       agentId: conv.agentId,
       conversationId: args.conversationId,
       messageId: assistantMessageId,
       userId: user._id,
       status: "pending",
+    });
+
+    // Push-based dispatch: notify agent server immediately
+    await ctx.scheduler.runAfter(0, internal.dispatch.notifyJobCreated, {
+      jobId,
     });
 
     return { userMessageId, assistantMessageId, rateLimited: false };

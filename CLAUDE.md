@@ -30,15 +30,16 @@ Monorepo with 3 packages:
 
 ## Adding a New Tool Set (Checklist)
 
-When adding a new feature or tool set, **all 5 steps are required** or the agent won't fully know about or use it:
+When adding a new feature or tool set, **all 6 steps are required** or the agent won't fully know about or use it:
 
 1. **Tool file** — Create `packages/agent/src/tools/<name>-tools.ts` exporting `create<Name>Tools()`
 2. **MCP server** — Wire into `packages/agent/src/mcp-server.ts`: import + conditional registration in `buildMcpServer()` and `buildAllowedTools()`
-3. **System prompt** — Update `packages/agent/src/system-prompt.ts`: add capability description and any usage guidelines so the agent knows *when and how* to use the tool
+3. **System prompt** — Update `packages/agent/src/system-prompt.ts`: add capability description, usage guidelines, **and** an entry in the `allIntegrations` map so disabled tool sets are advertised to users
 4. **UI settings** — Add entry to `TOOL_SET_INFO` in `packages/web/app/routes/agents.$agentId.settings.tsx`
 5. **Schema** — Add any new tables/indexes in `packages/shared/convex/schema.ts`, plus server-facing and user-facing endpoints
+6. **Tool Sets list** — Add the new key to the `enabledToolSets` list in this file (and `AGENTS.md`)
 
-> **Critical**: Step 3 is the most commonly missed. Without system prompt updates, the agent has the tool but doesn't know to use it effectively.
+> **Critical**: Step 3 is the most commonly missed. Without system prompt updates, the agent has the tool but doesn't know to use it effectively. The `allIntegrations` map is also important — it lets the agent tell users about available integrations they haven't enabled yet.
 
 ## Adding a New Tool to an Existing Tool Set
 
@@ -46,6 +47,16 @@ When adding a new feature or tool set, **all 5 steps are required** or the agent
 2. Add the tool name to `buildAllowedTools()` in `mcp-server.ts`
 3. Update system prompt guidance if the tool introduces new behavior the agent should know about
 4. Add any new Convex endpoints needed
+
+## System Prompt: Available Integrations
+
+The system prompt (`packages/agent/src/system-prompt.ts`) has two integration-related sections:
+- **Capabilities** — lists what's *enabled* so the agent knows what it can do
+- **Available Integrations** — lists what's *not enabled* so the agent can inform users about features they could turn on, and directs them to the Settings page in the Agent Maker dashboard
+
+When adding a new tool set, you must add it to **both**:
+1. The `capabilities` array (conditional on `has(enabled, "key")`)
+2. The `allIntegrations` map (always present, used to compute disabled integrations)
 
 ## Dev Commands
 

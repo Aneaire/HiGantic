@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { requireServerAuth } from "./serverAuth";
+import { internal } from "./_generated/api";
 
 // ── Timers / Delayed Actions ─────────────────────────────────────────
 // "Wait 5 minutes then follow up", "Remind me tomorrow at 9am"
@@ -41,7 +42,7 @@ export const create = mutation({
     const now = Date.now();
     const fireAt = args.fireAt ?? (args.delayMs ? now + args.delayMs : now + 60000);
 
-    return await ctx.db.insert("agentTimers", {
+    const timerId = await ctx.db.insert("agentTimers", {
       agentId: args.agentId,
       conversationId: args.conversationId,
       label: args.label.substring(0, 200),
@@ -50,6 +51,14 @@ export const create = mutation({
       status: "waiting",
       createdAt: now,
     });
+
+    // Schedule dispatch at exact fire time
+    const delayMs = Math.max(0, fireAt - now);
+    await ctx.scheduler.runAfter(delayMs, internal.dispatch.fireTimer, {
+      timerId,
+    });
+
+    return timerId;
   },
 });
 
