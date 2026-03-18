@@ -13,6 +13,7 @@ import { createWebhookManagementTools } from "./tools/webhook-management-tools.j
 import { createAgentMessageTools } from "./tools/agent-message-tools.js";
 import { createNotionTools } from "./tools/notion-tools.js";
 import { createSlackTools } from "./tools/slack-tools.js";
+import { createGCalTools } from "./tools/gcal-tools.js";
 
 interface Tab {
   _id: string;
@@ -45,6 +46,12 @@ interface SlackConfig {
   defaultChannel?: string;
 }
 
+interface GCalConfig {
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+}
+
 interface McpServerDeps {
   convexClient: AgentConvexClient;
   agentId: string;
@@ -56,6 +63,7 @@ interface McpServerDeps {
   emailConfig?: EmailConfig | null;
   notionConfig?: NotionConfig | null;
   slackConfig?: SlackConfig | null;
+  gcalConfig?: GCalConfig | null;
 }
 
 function has(enabledToolSets: string[], name: string): boolean {
@@ -144,6 +152,13 @@ export function buildMcpServer(deps: McpServerDeps) {
   if (has(enabled, "slack") && deps.slackConfig) {
     tools.push(
       ...createSlackTools(deps.convexClient, deps.agentId, deps.slackConfig)
+    );
+  }
+
+  // Google Calendar — gated by "google_calendar"
+  if (has(enabled, "google_calendar") && deps.gcalConfig) {
+    tools.push(
+      ...createGCalTools(deps.convexClient, deps.agentId, deps.gcalConfig)
     );
   }
 
@@ -275,6 +290,18 @@ export function buildAllowedTools(
       "mcp__agent-tools__slack_add_reaction",
       "mcp__agent-tools__slack_set_topic",
       "mcp__agent-tools__slack_search_messages"
+    );
+  }
+
+  // Google Calendar — gated by "google_calendar"
+  if (has(enabledToolSets, "google_calendar")) {
+    allowed.push(
+      "mcp__agent-tools__gcal_list_calendars",
+      "mcp__agent-tools__gcal_list_events",
+      "mcp__agent-tools__gcal_create_event",
+      "mcp__agent-tools__gcal_update_event",
+      "mcp__agent-tools__gcal_delete_event",
+      "mcp__agent-tools__gcal_find_free_time"
     );
   }
 

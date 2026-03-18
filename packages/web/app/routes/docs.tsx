@@ -93,6 +93,11 @@ const SECTIONS: DocSection[] = [
         title: "Slack",
         content: <SlackContent />,
       },
+      {
+        id: "google-calendar",
+        title: "Google Calendar",
+        content: <GCalContent />,
+      },
     ],
   },
   {
@@ -448,6 +453,7 @@ function QuickStartContent() {
           ["Inter-Agent Messaging", "Agents talk to each other"],
           ["Notion", "Search, read, create & update Notion pages/databases"],
           ["Slack", "Send messages, read channels, search & react in Slack"],
+          ["Google Calendar", "List events, schedule meetings, check availability"],
         ]}
       />
 
@@ -480,6 +486,10 @@ function QuickStartContent() {
       <DocH3>Slack</DocH3>
       <DocP>
         Enable "Slack", then add your Slack Bot token in <strong className="text-zinc-200">Settings</strong>. Create a Slack app, add the required bot scopes, install to your workspace, and paste the Bot User OAuth Token.
+      </DocP>
+      <DocH3>Google Calendar</DocH3>
+      <DocP>
+        Enable "Google Calendar", then add your OAuth Client ID, Client Secret, and Refresh Token in <strong className="text-zinc-200">Settings</strong>. Your agent can then list events, schedule meetings, check availability, and manage your calendar.
       </DocP>
     </div>
   );
@@ -764,6 +774,8 @@ function AutomationsContent() {
         ["notion.page_created", "A Notion page is created"],
         ["notion.page_updated", "A Notion page is updated"],
         ["slack.message_sent", "A message is posted to Slack"],
+        ["gcal.event_created", "A Google Calendar event is created"],
+        ["gcal.event_updated", "A Google Calendar event is modified"],
       ]} />
 
       <DocH2>Actions</DocH2>
@@ -1101,6 +1113,85 @@ search:read       — Search messages`}</DocCode>
   );
 }
 
+function GCalContent() {
+  return (
+    <div>
+      <DocH1>Google Calendar</DocH1>
+      <div className="flex gap-2 mb-4">
+        <DocBadge>Tool set: google_calendar</DocBadge>
+        <DocBadge>Default: Disabled</DocBadge>
+        <DocBadge>Requires: Google OAuth Credentials</DocBadge>
+      </div>
+      <DocP>
+        Connect your agent to Google Calendar to view upcoming events, schedule meetings, check availability, and manage your calendar — all through natural conversation.
+      </DocP>
+
+      <DocH2>Setup</DocH2>
+      <DocP>
+        1. Go to the <strong className="text-zinc-200">Google Cloud Console</strong> → APIs & Services → Enable the <strong className="text-zinc-200">Google Calendar API</strong>.
+      </DocP>
+      <DocP>
+        2. Create an <strong className="text-zinc-200">OAuth 2.0 Client ID</strong> (Web application type). Note the Client ID and Client Secret.
+      </DocP>
+      <DocP>
+        3. Use the <strong className="text-zinc-200">Google OAuth Playground</strong> (developers.google.com/oauthplayground) to authorize the <code className="text-zinc-200 bg-zinc-800 px-1 rounded">https://www.googleapis.com/auth/calendar</code> scope and obtain a Refresh Token.
+      </DocP>
+      <DocP>
+        4. In your agent's <strong className="text-zinc-200">Settings</strong>, enable Google Calendar and enter all three credentials.
+      </DocP>
+
+      <DocH2>Tools</DocH2>
+      <DocTable
+        headers={["Tool", "Description"]}
+        rows={[
+          ["gcal_list_calendars", "List all accessible calendars and their IDs"],
+          ["gcal_list_events", "List upcoming events with optional date range and search"],
+          ["gcal_create_event", "Create events with attendees, location, description, and Google Meet"],
+          ["gcal_update_event", "Reschedule or modify existing events"],
+          ["gcal_delete_event", "Cancel/delete events"],
+          ["gcal_find_free_time", "Check free/busy availability across calendars"],
+        ]}
+      />
+
+      <DocH2>Creating Events</DocH2>
+      <DocP>
+        Events support all-day dates (<code className="text-zinc-200 bg-zinc-800 px-1 rounded">2025-03-20</code>) or specific times (<code className="text-zinc-200 bg-zinc-800 px-1 rounded">2025-03-20T14:00:00-05:00</code>). Add attendees by email, set a location, and optionally attach a Google Meet link with <code className="text-zinc-200 bg-zinc-800 px-1 rounded">add_meet: true</code>.
+      </DocP>
+
+      <DocH2>Checking Availability</DocH2>
+      <DocP>
+        Use <code className="text-zinc-200 bg-zinc-800 px-1 rounded">gcal_find_free_time</code> to check when calendars are free or busy in a given time range. This is useful for finding open slots before scheduling meetings.
+      </DocP>
+
+      <DocH2>Events</DocH2>
+      <DocP>
+        Calendar actions emit events to the <AppLink to="/docs/advanced/event-bus">Event Bus</AppLink>:
+      </DocP>
+      <DocTable
+        headers={["Event", "When"]}
+        rows={[
+          ["gcal.event_created", "A new calendar event is created"],
+          ["gcal.event_updated", "An event is modified"],
+          ["gcal.event_deleted", "An event is deleted"],
+        ]}
+      />
+
+      <DocH2>Example</DocH2>
+      <DocP>
+        <strong className="text-zinc-200">User:</strong> "Schedule a team standup tomorrow at 10am for 30 minutes with alice@company.com and bob@company.com, add a Meet link"
+      </DocP>
+      <DocP>
+        <strong className="text-zinc-200">Agent:</strong> Creates a calendar event with the specified time, attendees, and Google Meet conference link.
+      </DocP>
+
+      <DocH2>Integration Ideas</DocH2>
+      <DocP>
+        Combine with <AppLink to="/docs/tools/slack">Slack</AppLink> to post daily agenda summaries. Use with <AppLink to="/docs/tools/schedules">Scheduled Actions</AppLink> for "every morning, check my calendar and brief me." Pair with <AppLink to="/docs/tools/timers">Timers</AppLink> for pre-meeting reminders.
+      </DocP>
+    </div>
+  );
+}
+
 function EventBusContent() {
   return (
     <div>
@@ -1135,6 +1226,9 @@ function EventBusContent() {
         ["notion.blocks_appended", "Content is appended to a Notion page"],
         ["slack.message_sent", "A message is posted to Slack"],
         ["slack.topic_set", "A Slack channel topic is updated"],
+        ["gcal.event_created", "A Google Calendar event is created"],
+        ["gcal.event_updated", "A Google Calendar event is modified"],
+        ["gcal.event_deleted", "A Google Calendar event is deleted"],
       ]} />
 
       <DocH2>Example: Chain Actions Together</DocH2>
@@ -1189,6 +1283,7 @@ function ToolSetsRefContent() {
           ["Inter-Agent Messaging", "agent_messages", "Disabled", "All"],
           ["Notion", "notion", "Disabled", "All"],
           ["Slack", "slack", "Disabled", "All"],
+          ["Google Calendar", "google_calendar", "Disabled", "All"],
           ["REST API", "rest_api", "Disabled", "Pro+"],
           ["PostgreSQL", "postgres", "Disabled", "Pro+"],
         ]}
@@ -1228,6 +1323,9 @@ function EventTypesContent() {
           ["notion.blocks_appended", "pageId, blockCount"],
           ["slack.message_sent", "channel, ts, threadTs"],
           ["slack.topic_set", "channel, topic"],
+          ["gcal.event_created", "eventId, title, start, end"],
+          ["gcal.event_updated", "eventId, updatedFields"],
+          ["gcal.event_deleted", "eventId"],
         ]}
       />
 

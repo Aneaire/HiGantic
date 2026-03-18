@@ -154,6 +154,11 @@ export function buildSystemPrompt(
       "- **Slack** — send messages, read channels, search messages, add reactions, and manage channel topics"
     );
   }
+  if (has(enabled, "google_calendar")) {
+    capabilities.push(
+      "- **Google Calendar** — list events, create/update/delete events, check availability, and schedule meetings"
+    );
+  }
 
   const capabilitiesSection =
     capabilities.length > 0
@@ -217,6 +222,22 @@ export function buildSystemPrompt(
 `
     : "";
 
+  // ── Google Calendar guidelines ─────────────────────────────────────
+  const gcalGuidance = has(enabled, "google_calendar")
+    ? `
+## Google Calendar
+- Use \`gcal_list_events\` to check what's on the user's calendar — defaults to the next 7 days
+- Use \`gcal_create_event\` to schedule meetings, reminders, or blocks — include timezone if the user has mentioned theirs
+- Use \`gcal_find_free_time\` to check availability before suggesting meeting times
+- Use \`gcal_update_event\` to reschedule or modify events (title, time, attendees, location)
+- Use \`gcal_delete_event\` to cancel events
+- Use \`gcal_list_calendars\` to find calendar IDs if the user has multiple calendars
+- When the user says "schedule", "book", "set up a meeting", "block time", or "what's on my calendar", use the appropriate tool
+- Always confirm times and attendees with the user before creating events with other people
+- Set \`add_meet: true\` if the user asks for a video call or virtual meeting
+`
+    : "";
+
   // ── Slack guidelines ───────────────────────────────────────────────
   const slackGuidance = has(enabled, "slack")
     ? `
@@ -252,7 +273,7 @@ Tell them: *"Go to your agent's Settings page, scroll to Custom HTTP Tools, and 
 `
     : "";
 
-  return `${agentConfig.systemPrompt}${conversationHistory}${memorySection}${tabSection}${knowledgeBaseSection}${customToolSection}${schedulesSection}${automationsSection}${capabilitiesSection}${autonomySection}${scheduleGuidance}${automationGuidance}${agentMessageGuidance}${notionGuidance}${slackGuidance}${customToolGuidance}
+  return `${agentConfig.systemPrompt}${conversationHistory}${memorySection}${tabSection}${knowledgeBaseSection}${customToolSection}${schedulesSection}${automationsSection}${capabilitiesSection}${autonomySection}${scheduleGuidance}${automationGuidance}${agentMessageGuidance}${notionGuidance}${slackGuidance}${gcalGuidance}${customToolGuidance}
 ## Interactive Questions
 When you need the user to choose between options (onboarding, preferences, configuration), use the \`ask_questions\` tool INSTEAD of writing numbered questions in plain text. This renders clickable option cards the user can select from. Do NOT duplicate the questions in your text — the tool handles display. Use this whenever you'd otherwise write "do you want A, B, or C?"
 

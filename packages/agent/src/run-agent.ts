@@ -198,6 +198,11 @@ export async function runAgent(params: RunAgentParams) {
       ? await convexClient.getToolConfig(params.agentId, "slack")
       : null;
 
+    // Load Google Calendar config if google_calendar tool is enabled
+    const gcalConfig = enabled.includes("google_calendar")
+      ? await convexClient.getToolConfig(params.agentId, "google_calendar")
+      : null;
+
     // Load schedules context if schedules tool is enabled
     const schedules = enabled.includes("schedules")
       ? await convexClient.listSchedules(params.agentId)
@@ -237,6 +242,7 @@ export async function runAgent(params: RunAgentParams) {
       emailConfig: emailConfig as any,
       notionConfig: notionConfig as any,
       slackConfig: slackConfig as any,
+      gcalConfig: gcalConfig as any,
     });
 
     const allowedTools = buildAllowedTools(

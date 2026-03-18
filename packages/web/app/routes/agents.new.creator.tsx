@@ -25,6 +25,7 @@ const TOOL_LABELS: Record<string, string> = {
   postgres: "PostgreSQL",
   notion: "Notion",
   slack: "Slack",
+  google_calendar: "Google Calendar",
 };
 
 export default function AgentCreatorPage() {
