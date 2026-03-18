@@ -193,6 +193,11 @@ export async function runAgent(params: RunAgentParams) {
       ? await convexClient.getToolConfig(params.agentId, "notion")
       : null;
 
+    // Load Slack config if slack tool is enabled
+    const slackConfig = enabled.includes("slack")
+      ? await convexClient.getToolConfig(params.agentId, "slack")
+      : null;
+
     // Load schedules context if schedules tool is enabled
     const schedules = enabled.includes("schedules")
       ? await convexClient.listSchedules(params.agentId)
@@ -231,6 +236,7 @@ export async function runAgent(params: RunAgentParams) {
       customTools: customTools as any,
       emailConfig: emailConfig as any,
       notionConfig: notionConfig as any,
+      slackConfig: slackConfig as any,
     });
 
     const allowedTools = buildAllowedTools(

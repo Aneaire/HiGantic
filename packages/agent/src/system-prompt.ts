@@ -149,6 +149,11 @@ export function buildSystemPrompt(
       "- **Notion** — search, read, create, and update pages and databases in the user's Notion workspace"
     );
   }
+  if (has(enabled, "slack")) {
+    capabilities.push(
+      "- **Slack** — send messages, read channels, search messages, add reactions, and manage channel topics"
+    );
+  }
 
   const capabilitiesSection =
     capabilities.length > 0
@@ -212,6 +217,21 @@ export function buildSystemPrompt(
 `
     : "";
 
+  // ── Slack guidelines ───────────────────────────────────────────────
+  const slackGuidance = has(enabled, "slack")
+    ? `
+## Slack Integration
+- Use \`slack_list_channels\` to find channel IDs before sending messages
+- Use \`slack_send_message\` to post to channels or reply to threads (provide thread_ts)
+- Use \`slack_read_messages\` to check recent channel activity or read thread replies
+- Use \`slack_search_messages\` to find specific messages across channels
+- Use \`slack_add_reaction\` to react to messages with emoji
+- Use \`slack_set_topic\` to update channel topics
+- When the user says "post to Slack" or "notify the team", use slack_send_message
+- Slack messages support mrkdwn formatting: *bold*, _italic_, ~strike~, \`code\`, > quote, bullet lists
+`
+    : "";
+
   // ── Custom tools guidance (only if enabled) ─────────────────────────
   const customToolGuidance = has(enabled, "custom_http_tools")
     ? `
@@ -232,7 +252,7 @@ Tell them: *"Go to your agent's Settings page, scroll to Custom HTTP Tools, and 
 `
     : "";
 
-  return `${agentConfig.systemPrompt}${conversationHistory}${memorySection}${tabSection}${knowledgeBaseSection}${customToolSection}${schedulesSection}${automationsSection}${capabilitiesSection}${autonomySection}${scheduleGuidance}${automationGuidance}${agentMessageGuidance}${notionGuidance}${customToolGuidance}
+  return `${agentConfig.systemPrompt}${conversationHistory}${memorySection}${tabSection}${knowledgeBaseSection}${customToolSection}${schedulesSection}${automationsSection}${capabilitiesSection}${autonomySection}${scheduleGuidance}${automationGuidance}${agentMessageGuidance}${notionGuidance}${slackGuidance}${customToolGuidance}
 ## Interactive Questions
 When you need the user to choose between options (onboarding, preferences, configuration), use the \`ask_questions\` tool INSTEAD of writing numbered questions in plain text. This renders clickable option cards the user can select from. Do NOT duplicate the questions in your text — the tool handles display. Use this whenever you'd otherwise write "do you want A, B, or C?"
 

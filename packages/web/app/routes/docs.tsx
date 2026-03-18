@@ -88,6 +88,11 @@ const SECTIONS: DocSection[] = [
         title: "Notion",
         content: <NotionContent />,
       },
+      {
+        id: "slack",
+        title: "Slack",
+        content: <SlackContent />,
+      },
     ],
   },
   {
@@ -442,6 +447,7 @@ function QuickStartContent() {
           ["Webhooks", "Send/receive webhooks"],
           ["Inter-Agent Messaging", "Agents talk to each other"],
           ["Notion", "Search, read, create & update Notion pages/databases"],
+          ["Slack", "Send messages, read channels, search & react in Slack"],
         ]}
       />
 
@@ -470,6 +476,10 @@ function QuickStartContent() {
       <DocH3>Notion</DocH3>
       <DocP>
         Enable "Notion", then add your Notion integration token in <strong className="text-zinc-200">Settings</strong>. Share the pages and databases you want accessed with the integration in Notion. Your agent can then search, read, create, and update Notion content.
+      </DocP>
+      <DocH3>Slack</DocH3>
+      <DocP>
+        Enable "Slack", then add your Slack Bot token in <strong className="text-zinc-200">Settings</strong>. Create a Slack app, add the required bot scopes, install to your workspace, and paste the Bot User OAuth Token.
       </DocP>
     </div>
   );
@@ -753,6 +763,7 @@ function AutomationsContent() {
         ["agent_message.received", "A message from another agent arrives"],
         ["notion.page_created", "A Notion page is created"],
         ["notion.page_updated", "A Notion page is updated"],
+        ["slack.message_sent", "A message is posted to Slack"],
       ]} />
 
       <DocH2>Actions</DocH2>
@@ -999,6 +1010,97 @@ function NotionContent() {
   );
 }
 
+function SlackContent() {
+  return (
+    <div>
+      <DocH1>Slack</DocH1>
+      <div className="flex gap-2 mb-4">
+        <DocBadge>Tool set: slack</DocBadge>
+        <DocBadge>Default: Disabled</DocBadge>
+        <DocBadge>Requires: Slack Bot Token</DocBadge>
+      </div>
+      <DocP>
+        Connect your agent to Slack to send messages, read channels, search conversations, add reactions, and manage channel topics. Perfect for team notifications, status updates, and automated workflows.
+      </DocP>
+
+      <DocH2>Setup</DocH2>
+      <DocP>
+        1. Create a Slack app at <strong className="text-zinc-200">api.slack.com/apps</strong>.
+      </DocP>
+      <DocP>
+        2. Under <strong className="text-zinc-200">OAuth & Permissions</strong>, add these bot token scopes:
+      </DocP>
+      <DocCode>{`chat:write        — Send messages
+channels:read     — List public channels
+channels:history  — Read public channel messages
+groups:read       — List private channels
+groups:history    — Read private channel messages
+reactions:write   — Add emoji reactions
+search:read       — Search messages`}</DocCode>
+      <DocP>
+        3. Install the app to your workspace and copy the <strong className="text-zinc-200">Bot User OAuth Token</strong> (starts with xoxb-).
+      </DocP>
+      <DocP>
+        4. In your agent's <strong className="text-zinc-200">Settings</strong>, enable Slack and paste the token.
+      </DocP>
+      <DocP>
+        5. Invite the bot to channels it should access: type <code className="text-zinc-200 bg-zinc-800 px-1 rounded">/invite @YourBotName</code> in each channel.
+      </DocP>
+
+      <DocH2>Tools</DocH2>
+      <DocTable
+        headers={["Tool", "Description"]}
+        rows={[
+          ["slack_send_message", "Send a message to a channel or thread"],
+          ["slack_list_channels", "List available channels with IDs and topics"],
+          ["slack_read_messages", "Read recent messages from a channel or thread"],
+          ["slack_add_reaction", "Add an emoji reaction to a message"],
+          ["slack_set_topic", "Set a channel's topic"],
+          ["slack_search_messages", "Search messages across channels"],
+        ]}
+      />
+
+      <DocH2>Sending Messages</DocH2>
+      <DocP>
+        Messages support Slack's mrkdwn formatting:
+      </DocP>
+      <DocCode>{`*bold*  _italic_  ~strikethrough~  \`code\`
+> blockquote
+• bullet list (use bullet character)
+<https://example.com|Link Text>
+:emoji_name:`}</DocCode>
+      <DocP>
+        To reply in a thread, pass the <code className="text-zinc-200 bg-zinc-800 px-1 rounded">thread_ts</code> parameter (the timestamp of the parent message).
+      </DocP>
+
+      <DocH2>Events</DocH2>
+      <DocP>
+        Slack actions emit events to the <AppLink to="/docs/advanced/event-bus">Event Bus</AppLink>:
+      </DocP>
+      <DocTable
+        headers={["Event", "When"]}
+        rows={[
+          ["slack.message_sent", "A message is posted to Slack"],
+          ["slack.topic_set", "A channel topic is updated"],
+        ]}
+      />
+
+      <DocH2>Example</DocH2>
+      <DocP>
+        <strong className="text-zinc-200">User:</strong> "Post a summary of today's completed tasks to #team-updates"
+      </DocP>
+      <DocP>
+        <strong className="text-zinc-200">Agent:</strong> Lists channels to find #team-updates, reads the task board, composes a summary, and posts it.
+      </DocP>
+
+      <DocH2>Integration Ideas</DocH2>
+      <DocP>
+        Combine with <AppLink to="/docs/tools/automations">Automations</AppLink> for event-driven Slack notifications (e.g., "when a task is completed → post to #done"). Use with <AppLink to="/docs/tools/schedules">Scheduled Actions</AppLink> for daily standups or weekly reports posted to Slack.
+      </DocP>
+    </div>
+  );
+}
+
 function EventBusContent() {
   return (
     <div>
@@ -1031,6 +1133,8 @@ function EventBusContent() {
         ["notion.page_updated", "A Notion page's properties are updated"],
         ["notion.database_queried", "A Notion database is queried"],
         ["notion.blocks_appended", "Content is appended to a Notion page"],
+        ["slack.message_sent", "A message is posted to Slack"],
+        ["slack.topic_set", "A Slack channel topic is updated"],
       ]} />
 
       <DocH2>Example: Chain Actions Together</DocH2>
@@ -1084,6 +1188,7 @@ function ToolSetsRefContent() {
           ["Webhooks", "webhooks", "Disabled", "All"],
           ["Inter-Agent Messaging", "agent_messages", "Disabled", "All"],
           ["Notion", "notion", "Disabled", "All"],
+          ["Slack", "slack", "Disabled", "All"],
           ["REST API", "rest_api", "Disabled", "Pro+"],
           ["PostgreSQL", "postgres", "Disabled", "Pro+"],
         ]}
@@ -1121,6 +1226,8 @@ function EventTypesContent() {
           ["notion.page_updated", "pageId, updatedProperties"],
           ["notion.database_queried", "databaseId, resultCount"],
           ["notion.blocks_appended", "pageId, blockCount"],
+          ["slack.message_sent", "channel, ts, threadTs"],
+          ["slack.topic_set", "channel, topic"],
         ]}
       />
 

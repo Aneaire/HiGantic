@@ -12,6 +12,7 @@ import { createTimerTools } from "./tools/timer-tools.js";
 import { createWebhookManagementTools } from "./tools/webhook-management-tools.js";
 import { createAgentMessageTools } from "./tools/agent-message-tools.js";
 import { createNotionTools } from "./tools/notion-tools.js";
+import { createSlackTools } from "./tools/slack-tools.js";
 
 interface Tab {
   _id: string;
@@ -39,6 +40,11 @@ interface NotionConfig {
   apiKey: string;
 }
 
+interface SlackConfig {
+  botToken: string;
+  defaultChannel?: string;
+}
+
 interface McpServerDeps {
   convexClient: AgentConvexClient;
   agentId: string;
@@ -49,6 +55,7 @@ interface McpServerDeps {
   customTools: CustomToolConfig[];
   emailConfig?: EmailConfig | null;
   notionConfig?: NotionConfig | null;
+  slackConfig?: SlackConfig | null;
 }
 
 function has(enabledToolSets: string[], name: string): boolean {
@@ -130,6 +137,13 @@ export function buildMcpServer(deps: McpServerDeps) {
   if (has(enabled, "notion") && deps.notionConfig) {
     tools.push(
       ...createNotionTools(deps.convexClient, deps.agentId, deps.notionConfig)
+    );
+  }
+
+  // Slack — gated by "slack"
+  if (has(enabled, "slack") && deps.slackConfig) {
+    tools.push(
+      ...createSlackTools(deps.convexClient, deps.agentId, deps.slackConfig)
     );
   }
 
@@ -249,6 +263,18 @@ export function buildAllowedTools(
       "mcp__agent-tools__notion_update_page",
       "mcp__agent-tools__notion_get_page",
       "mcp__agent-tools__notion_append_blocks"
+    );
+  }
+
+  // Slack — gated by "slack"
+  if (has(enabledToolSets, "slack")) {
+    allowed.push(
+      "mcp__agent-tools__slack_send_message",
+      "mcp__agent-tools__slack_list_channels",
+      "mcp__agent-tools__slack_read_messages",
+      "mcp__agent-tools__slack_add_reaction",
+      "mcp__agent-tools__slack_set_topic",
+      "mcp__agent-tools__slack_search_messages"
     );
   }
 

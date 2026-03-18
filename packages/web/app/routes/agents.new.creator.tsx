@@ -24,6 +24,7 @@ const TOOL_LABELS: Record<string, string> = {
   rest_api: "REST API",
   postgres: "PostgreSQL",
   notion: "Notion",
+  slack: "Slack",
 };
 
 export default function AgentCreatorPage() {

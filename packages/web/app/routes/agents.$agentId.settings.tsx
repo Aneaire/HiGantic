@@ -22,6 +22,7 @@ import {
   Check,
   Mail,
   BookOpen,
+  Hash,
 } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect, useRef } from "react";
@@ -79,6 +80,10 @@ const TOOL_SET_INFO: Record<
     label: "Notion",
     description: "Search, read, create, and update pages and databases in Notion",
   },
+  slack: {
+    label: "Slack",
+    description: "Send messages, read channels, search, and react in Slack",
+  },
 };
 
 const AGENT_SERVER_URL =
@@ -117,6 +122,9 @@ export default function SettingsPage() {
         )}
         {(agent.enabledToolSets ?? []).includes("notion") && (
           <NotionConfigSection agent={agent} />
+        )}
+        {(agent.enabledToolSets ?? []).includes("slack") && (
+          <SlackConfigSection agent={agent} />
         )}
         <CustomToolsSection agent={agent} />
       </div>
@@ -857,6 +865,114 @@ function NotionConfigSection({ agent }: { agent: Doc<"agents"> }) {
           </a>
           . Then share the pages/databases you want the agent to access with
           the integration.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+// ── Slack Config ──────────────────────────────────────────────────────
+
+function SlackConfigSection({ agent }: { agent: Doc<"agents"> }) {
+  const existingConfig = useQuery(api.agents.getToolConfig, {
+    agentId: agent._id,
+    toolSetName: "slack",
+  });
+  const saveConfig = useMutation(api.agents.saveToolConfig);
+  const [botToken, setBotToken] = useState("");
+  const [defaultChannel, setDefaultChannel] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (existingConfig && !loaded) {
+      setBotToken(existingConfig.botToken ?? "");
+      setDefaultChannel(existingConfig.defaultChannel ?? "");
+      setLoaded(true);
+    }
+  }, [existingConfig, loaded]);
+
+  const hasChanges =
+    loaded &&
+    (botToken !== (existingConfig?.botToken ?? "") ||
+      defaultChannel !== (existingConfig?.defaultChannel ?? ""));
+
+  async function handleSave() {
+    if (!botToken.trim()) return;
+    setSaving(true);
+    try {
+      await saveConfig({
+        agentId: agent._id,
+        toolSetName: "slack",
+        config: {
+          botToken: botToken.trim(),
+          defaultChannel: defaultChannel.trim() || undefined,
+        },
+      });
+    } catch (err: any) {
+      alert(err.message);
+    }
+    setSaving(false);
+  }
+
+  return (
+    <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-6">
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-2">
+          <Hash className="h-4 w-4 text-zinc-400" />
+          <h2 className="text-sm font-medium">Slack Configuration</h2>
+        </div>
+        {hasChanges && (
+          <button
+            onClick={handleSave}
+            disabled={saving || !botToken.trim()}
+            className="flex items-center gap-1.5 text-xs bg-zinc-100 text-zinc-900 px-3 py-1.5 rounded-lg font-medium hover:bg-zinc-200 disabled:opacity-50 transition-colors"
+          >
+            <Save className="h-3 w-3" />
+            {saving ? "Saving..." : "Save"}
+          </button>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        <Field label="Bot User OAuth Token">
+          <input
+            type="password"
+            value={botToken}
+            onChange={(e) => setBotToken(e.target.value)}
+            placeholder="xoxb-..."
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-mono placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none"
+          />
+        </Field>
+
+        <Field label="Default Channel (optional)">
+          <input
+            type="text"
+            value={defaultChannel}
+            onChange={(e) => setDefaultChannel(e.target.value)}
+            placeholder="#general or C01234ABCDE"
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none"
+          />
+        </Field>
+
+        <p className="text-[11px] text-zinc-600 leading-relaxed">
+          Create a Slack app at{" "}
+          <a
+            href="https://api.slack.com/apps"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-zinc-400 underline hover:text-zinc-300"
+          >
+            api.slack.com/apps
+          </a>
+          . Add bot token scopes: <code className="text-zinc-500">chat:write</code>,{" "}
+          <code className="text-zinc-500">channels:read</code>,{" "}
+          <code className="text-zinc-500">channels:history</code>,{" "}
+          <code className="text-zinc-500">groups:read</code>,{" "}
+          <code className="text-zinc-500">groups:history</code>,{" "}
+          <code className="text-zinc-500">reactions:write</code>,{" "}
+          <code className="text-zinc-500">search:read</code>.
+          Then install to your workspace and copy the Bot token.
         </p>
       </div>
     </section>
