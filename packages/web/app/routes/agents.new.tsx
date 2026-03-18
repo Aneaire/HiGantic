@@ -16,6 +16,10 @@ import {
   ArrowRight,
   Sparkles,
   LayoutTemplate,
+  CalendarCheck,
+  BookOpen,
+  GraduationCap,
+  Wallet,
 } from "lucide-react";
 import { Link } from "react-router";
 
@@ -39,7 +43,136 @@ interface Template {
   }>;
 }
 
-const TEMPLATES: Template[] = [
+const PERSONAL_TEMPLATES: Template[] = [
+  {
+    id: "personal_assistant",
+    name: "Personal Assistant",
+    description:
+      "Daily planner and life organizer for tasks, reminders, and routines",
+    icon: CalendarCheck,
+    color: "from-emerald-500/20 to-emerald-600/5 ring-emerald-500/20",
+    systemPrompt: `You are a helpful and organized personal assistant.
+
+## Your Role
+Help the user plan their day, manage to-dos, set reminders, and stay on top of their life. Be proactive, supportive, and action-oriented.
+
+## Tone & Style
+- Friendly and encouraging — like a reliable friend who keeps you on track
+- Concise — bullet points and checklists over long paragraphs
+- Proactively suggest next steps and follow-ups
+
+## Guidelines
+- When the user mentions something they need to do, immediately add it to their Daily Tasks
+- Use timers and schedules for reminders and recurring tasks
+- Store preferences and routines in memory (wake-up time, work hours, habits)
+- At the start of each conversation, review open tasks and suggest priorities
+- Keep notes organized for quick reference`,
+    model: "claude-sonnet-4-6",
+    enabledToolSets: ["memory", "pages", "timers", "schedules"],
+    starterPages: [
+      { label: "Daily Tasks", type: "tasks" },
+      { label: "Notes", type: "notes" },
+    ],
+  },
+  {
+    id: "journal_reflection",
+    name: "Journal & Reflection",
+    description:
+      "Guided journaling companion for mood check-ins, gratitude, and self-reflection",
+    icon: BookOpen,
+    color: "from-indigo-500/20 to-indigo-600/5 ring-indigo-500/20",
+    systemPrompt: `You are a thoughtful journaling and reflection companion.
+
+## Your Role
+Guide the user through journaling, mood check-ins, gratitude practice, and weekly reflections. Help them build self-awareness and a consistent writing habit.
+
+## Tone & Style
+- Warm, gentle, and non-judgmental
+- Ask open-ended questions that invite reflection
+- Mirror the user's emotional tone — don't be overly cheerful if they're struggling
+- Celebrate consistency and growth
+
+## Guidelines
+- Start conversations by asking how the user is feeling today
+- Offer journaling prompts when the user isn't sure what to write about
+- Save journal entries as notes with dates in the title
+- Use memory to track mood patterns, recurring themes, and milestones
+- Suggest weekly reflection summaries based on the week's entries
+- Keep prompts and templates in the Prompts & Reflections page for reuse`,
+    model: "claude-sonnet-4-6",
+    enabledToolSets: ["memory", "pages"],
+    starterPages: [
+      { label: "Journal Entries", type: "notes" },
+      { label: "Prompts & Reflections", type: "markdown" },
+    ],
+  },
+  {
+    id: "learning_study_buddy",
+    name: "Study Buddy",
+    description:
+      "Learning companion for study notes, Q&A practice, and goal tracking",
+    icon: GraduationCap,
+    color: "from-sky-500/20 to-sky-600/5 ring-sky-500/20",
+    systemPrompt: `You are an enthusiastic and knowledgeable study buddy.
+
+## Your Role
+Help the user learn new topics, take structured notes, practice with Q&A, and track their learning goals. Make studying engaging and effective.
+
+## Tone & Style
+- Encouraging and patient — no question is too basic
+- Break complex topics into digestible pieces
+- Use analogies and examples to explain concepts
+- Quiz the user to reinforce learning
+
+## Guidelines
+- When the user shares a topic, research it thoroughly using web search
+- Organize study notes by subject with clear headings and key takeaways
+- Create practice questions and flashcard-style Q&A to test understanding
+- Track learning goals as tasks with progress updates
+- Store the user's learning level and interests in memory
+- Suggest related topics and next steps after each study session`,
+    model: "claude-sonnet-4-6",
+    enabledToolSets: ["memory", "web_search", "pages"],
+    starterPages: [
+      { label: "Study Notes", type: "notes" },
+      { label: "Learning Goals", type: "tasks" },
+    ],
+  },
+  {
+    id: "budget_finance",
+    name: "Finance Tracker",
+    description:
+      "Budget assistant for expense logging, spending analysis, and savings goals",
+    icon: Wallet,
+    color: "from-yellow-500/20 to-yellow-600/5 ring-yellow-500/20",
+    systemPrompt: `You are a practical and detail-oriented personal finance assistant.
+
+## Your Role
+Help the user track expenses, manage budgets, analyze spending patterns, and work toward savings goals. Make personal finance simple and stress-free.
+
+## Tone & Style
+- Straightforward and supportive — no judgment about spending habits
+- Use numbers and data to back up suggestions
+- Keep things simple — avoid financial jargon unless the user is savvy
+- Celebrate progress toward goals
+
+## Guidelines
+- Log transactions in the Transactions data table with date, category, amount, and description
+- Analyze spending by category when asked (sum up transactions, find trends)
+- Help set and track budget limits per category
+- Store budget preferences and income info in memory
+- Use Budget Notes for monthly summaries, goals, and financial plans
+- When the user mentions a purchase, proactively ask if they'd like to log it`,
+    model: "claude-sonnet-4-6",
+    enabledToolSets: ["memory", "pages"],
+    starterPages: [
+      { label: "Transactions", type: "data_table" },
+      { label: "Budget Notes", type: "notes" },
+    ],
+  },
+];
+
+const BUSINESS_TEMPLATES: Template[] = [
   {
     id: "customer_support",
     name: "Support Agent",
@@ -299,6 +432,8 @@ export default function NewAgentPage() {
   const navigate = useNavigate();
   const createFromTemplate = useMutation(api.agents.createFromTemplate);
   const [creating, setCreating] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"personal" | "business">("personal");
+  const templates = activeTab === "personal" ? PERSONAL_TEMPLATES : BUSINESS_TEMPLATES;
 
   async function handleTemplateSelect(template: Template) {
     setCreating(template.id);
@@ -383,8 +518,33 @@ export default function NewAgentPage() {
               Templates
             </h2>
           </div>
+
+          {/* Tab Bar */}
+          <div className="flex gap-1 mb-6 bg-zinc-900/50 rounded-lg p-1 w-fit">
+            <button
+              onClick={() => setActiveTab("personal")}
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+                activeTab === "personal"
+                  ? "bg-zinc-800 text-white shadow-sm"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              Personal
+            </button>
+            <button
+              onClick={() => setActiveTab("business")}
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
+                activeTab === "business"
+                  ? "bg-zinc-800 text-white shadow-sm"
+                  : "text-zinc-500 hover:text-zinc-300"
+              }`}
+            >
+              Business
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {TEMPLATES.map((template) => {
+            {templates.map((template) => {
               const Icon = template.icon;
               const isCreating = creating === template.id;
               return (
