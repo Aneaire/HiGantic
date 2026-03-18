@@ -26,6 +26,8 @@ const TOOL_LABELS: Record<string, string> = {
   notion: "Notion",
   slack: "Slack",
   google_calendar: "Google Calendar",
+  google_drive: "Google Drive",
+  google_sheets: "Google Sheets",
 };
 
 export default function AgentCreatorPage() {

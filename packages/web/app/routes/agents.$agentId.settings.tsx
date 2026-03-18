@@ -24,6 +24,8 @@ import {
   BookOpen,
   Hash,
   Calendar,
+  HardDrive,
+  Table,
 } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect, useRef } from "react";
@@ -89,6 +91,14 @@ const TOOL_SET_INFO: Record<
     label: "Google Calendar",
     description: "List events, schedule meetings, check availability, and manage calendar",
   },
+  google_drive: {
+    label: "Google Drive",
+    description: "Search, read, create, and manage files and folders in Google Drive",
+  },
+  google_sheets: {
+    label: "Google Sheets",
+    description: "Read, write, and manage spreadsheet data in Google Sheets",
+  },
 };
 
 const AGENT_SERVER_URL =
@@ -133,6 +143,12 @@ export default function SettingsPage() {
         )}
         {(agent.enabledToolSets ?? []).includes("google_calendar") && (
           <GCalConfigSection agent={agent} />
+        )}
+        {(agent.enabledToolSets ?? []).includes("google_drive") && (
+          <GDriveConfigSection agent={agent} />
+        )}
+        {(agent.enabledToolSets ?? []).includes("google_sheets") && (
+          <GSheetsConfigSection agent={agent} />
         )}
         <CustomToolsSection agent={agent} />
       </div>
@@ -1116,6 +1132,182 @@ function GCalConfigSection({ agent }: { agent: Doc<"agents"> }) {
             https://www.googleapis.com/auth/calendar
           </code>{" "}
           scope.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+// ── Google Drive Config ────────────────────────────────────────────────
+
+function GDriveConfigSection({ agent }: { agent: Doc<"agents"> }) {
+  const existingConfig = useQuery(api.agents.getToolConfig, {
+    agentId: agent._id,
+    toolSetName: "google_drive",
+  });
+  const saveConfig = useMutation(api.agents.saveToolConfig);
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [refreshToken, setRefreshToken] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (existingConfig && !loaded) {
+      setClientId(existingConfig.clientId ?? "");
+      setClientSecret(existingConfig.clientSecret ?? "");
+      setRefreshToken(existingConfig.refreshToken ?? "");
+      setLoaded(true);
+    }
+  }, [existingConfig, loaded]);
+
+  const hasChanges =
+    loaded &&
+    (clientId !== (existingConfig?.clientId ?? "") ||
+      clientSecret !== (existingConfig?.clientSecret ?? "") ||
+      refreshToken !== (existingConfig?.refreshToken ?? ""));
+
+  async function handleSave() {
+    if (!clientId.trim() || !clientSecret.trim() || !refreshToken.trim())
+      return;
+    setSaving(true);
+    try {
+      await saveConfig({
+        agentId: agent._id,
+        toolSetName: "google_drive",
+        config: {
+          clientId: clientId.trim(),
+          clientSecret: clientSecret.trim(),
+          refreshToken: refreshToken.trim(),
+        },
+      });
+    } catch (err: any) {
+      alert(err.message);
+    }
+    setSaving(false);
+  }
+
+  return (
+    <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-6">
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-2">
+          <HardDrive className="h-4 w-4 text-zinc-400" />
+          <h2 className="text-sm font-medium">Google Drive Configuration</h2>
+        </div>
+        {hasChanges && (
+          <button
+            onClick={handleSave}
+            disabled={saving || !clientId.trim() || !clientSecret.trim() || !refreshToken.trim()}
+            className="flex items-center gap-1.5 text-xs bg-zinc-100 text-zinc-900 px-3 py-1.5 rounded-lg font-medium hover:bg-zinc-200 disabled:opacity-50 transition-colors"
+          >
+            <Save className="h-3 w-3" />
+            {saving ? "Saving..." : "Save"}
+          </button>
+        )}
+      </div>
+      <div className="space-y-4">
+        <Field label="OAuth Client ID">
+          <input type="text" value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="123456789-abc.apps.googleusercontent.com" className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-mono placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none" />
+        </Field>
+        <Field label="OAuth Client Secret">
+          <input type="password" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} placeholder="GOCSPX-..." className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-mono placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none" />
+        </Field>
+        <Field label="Refresh Token">
+          <input type="password" value={refreshToken} onChange={(e) => setRefreshToken(e.target.value)} placeholder="1//0abc..." className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-mono placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none" />
+        </Field>
+        <p className="text-[11px] text-zinc-600 leading-relaxed">
+          Use the same Google Cloud project as Calendar. Enable the <strong className="text-zinc-500">Google Drive API</strong> and generate a refresh token with the{" "}
+          <code className="text-zinc-500">https://www.googleapis.com/auth/drive</code> scope via the{" "}
+          <a href="https://developers.google.com/oauthplayground" target="_blank" rel="noopener noreferrer" className="text-zinc-400 underline hover:text-zinc-300">OAuth Playground</a>.
+          You can reuse the same Client ID and Secret.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+// ── Google Sheets Config ──────────────────────────────────────────────
+
+function GSheetsConfigSection({ agent }: { agent: Doc<"agents"> }) {
+  const existingConfig = useQuery(api.agents.getToolConfig, {
+    agentId: agent._id,
+    toolSetName: "google_sheets",
+  });
+  const saveConfig = useMutation(api.agents.saveToolConfig);
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [refreshToken, setRefreshToken] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    if (existingConfig && !loaded) {
+      setClientId(existingConfig.clientId ?? "");
+      setClientSecret(existingConfig.clientSecret ?? "");
+      setRefreshToken(existingConfig.refreshToken ?? "");
+      setLoaded(true);
+    }
+  }, [existingConfig, loaded]);
+
+  const hasChanges =
+    loaded &&
+    (clientId !== (existingConfig?.clientId ?? "") ||
+      clientSecret !== (existingConfig?.clientSecret ?? "") ||
+      refreshToken !== (existingConfig?.refreshToken ?? ""));
+
+  async function handleSave() {
+    if (!clientId.trim() || !clientSecret.trim() || !refreshToken.trim())
+      return;
+    setSaving(true);
+    try {
+      await saveConfig({
+        agentId: agent._id,
+        toolSetName: "google_sheets",
+        config: {
+          clientId: clientId.trim(),
+          clientSecret: clientSecret.trim(),
+          refreshToken: refreshToken.trim(),
+        },
+      });
+    } catch (err: any) {
+      alert(err.message);
+    }
+    setSaving(false);
+  }
+
+  return (
+    <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-6">
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-2">
+          <Table className="h-4 w-4 text-zinc-400" />
+          <h2 className="text-sm font-medium">Google Sheets Configuration</h2>
+        </div>
+        {hasChanges && (
+          <button
+            onClick={handleSave}
+            disabled={saving || !clientId.trim() || !clientSecret.trim() || !refreshToken.trim()}
+            className="flex items-center gap-1.5 text-xs bg-zinc-100 text-zinc-900 px-3 py-1.5 rounded-lg font-medium hover:bg-zinc-200 disabled:opacity-50 transition-colors"
+          >
+            <Save className="h-3 w-3" />
+            {saving ? "Saving..." : "Save"}
+          </button>
+        )}
+      </div>
+      <div className="space-y-4">
+        <Field label="OAuth Client ID">
+          <input type="text" value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="123456789-abc.apps.googleusercontent.com" className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-mono placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none" />
+        </Field>
+        <Field label="OAuth Client Secret">
+          <input type="password" value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} placeholder="GOCSPX-..." className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-mono placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none" />
+        </Field>
+        <Field label="Refresh Token">
+          <input type="password" value={refreshToken} onChange={(e) => setRefreshToken(e.target.value)} placeholder="1//0abc..." className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-mono placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none" />
+        </Field>
+        <p className="text-[11px] text-zinc-600 leading-relaxed">
+          Use the same Google Cloud project. Enable the <strong className="text-zinc-500">Google Sheets API</strong> and generate a refresh token with the{" "}
+          <code className="text-zinc-500">https://www.googleapis.com/auth/spreadsheets</code> scope via the{" "}
+          <a href="https://developers.google.com/oauthplayground" target="_blank" rel="noopener noreferrer" className="text-zinc-400 underline hover:text-zinc-300">OAuth Playground</a>.
+          You can reuse the same Client ID and Secret.
         </p>
       </div>
     </section>

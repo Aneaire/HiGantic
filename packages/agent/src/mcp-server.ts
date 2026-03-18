@@ -14,6 +14,8 @@ import { createAgentMessageTools } from "./tools/agent-message-tools.js";
 import { createNotionTools } from "./tools/notion-tools.js";
 import { createSlackTools } from "./tools/slack-tools.js";
 import { createGCalTools } from "./tools/gcal-tools.js";
+import { createGDriveTools } from "./tools/gdrive-tools.js";
+import { createGSheetsTools } from "./tools/gsheets-tools.js";
 
 interface Tab {
   _id: string;
@@ -52,6 +54,18 @@ interface GCalConfig {
   refreshToken: string;
 }
 
+interface GDriveConfig {
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+}
+
+interface GSheetsConfig {
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+}
+
 interface McpServerDeps {
   convexClient: AgentConvexClient;
   agentId: string;
@@ -64,6 +78,8 @@ interface McpServerDeps {
   notionConfig?: NotionConfig | null;
   slackConfig?: SlackConfig | null;
   gcalConfig?: GCalConfig | null;
+  gdriveConfig?: GDriveConfig | null;
+  gsheetsConfig?: GSheetsConfig | null;
 }
 
 function has(enabledToolSets: string[], name: string): boolean {
@@ -159,6 +175,20 @@ export function buildMcpServer(deps: McpServerDeps) {
   if (has(enabled, "google_calendar") && deps.gcalConfig) {
     tools.push(
       ...createGCalTools(deps.convexClient, deps.agentId, deps.gcalConfig)
+    );
+  }
+
+  // Google Drive — gated by "google_drive"
+  if (has(enabled, "google_drive") && deps.gdriveConfig) {
+    tools.push(
+      ...createGDriveTools(deps.convexClient, deps.agentId, deps.gdriveConfig)
+    );
+  }
+
+  // Google Sheets — gated by "google_sheets"
+  if (has(enabled, "google_sheets") && deps.gsheetsConfig) {
+    tools.push(
+      ...createGSheetsTools(deps.convexClient, deps.agentId, deps.gsheetsConfig)
     );
   }
 
@@ -302,6 +332,30 @@ export function buildAllowedTools(
       "mcp__agent-tools__gcal_update_event",
       "mcp__agent-tools__gcal_delete_event",
       "mcp__agent-tools__gcal_find_free_time"
+    );
+  }
+
+  // Google Drive — gated by "google_drive"
+  if (has(enabledToolSets, "google_drive")) {
+    allowed.push(
+      "mcp__agent-tools__gdrive_search",
+      "mcp__agent-tools__gdrive_list_files",
+      "mcp__agent-tools__gdrive_read_file",
+      "mcp__agent-tools__gdrive_create_file",
+      "mcp__agent-tools__gdrive_move_file",
+      "mcp__agent-tools__gdrive_delete_file"
+    );
+  }
+
+  // Google Sheets — gated by "google_sheets"
+  if (has(enabledToolSets, "google_sheets")) {
+    allowed.push(
+      "mcp__agent-tools__gsheets_create",
+      "mcp__agent-tools__gsheets_get_info",
+      "mcp__agent-tools__gsheets_read",
+      "mcp__agent-tools__gsheets_write",
+      "mcp__agent-tools__gsheets_append",
+      "mcp__agent-tools__gsheets_clear"
     );
   }
 

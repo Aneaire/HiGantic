@@ -159,6 +159,16 @@ export function buildSystemPrompt(
       "- **Google Calendar** — list events, create/update/delete events, check availability, and schedule meetings"
     );
   }
+  if (has(enabled, "google_drive")) {
+    capabilities.push(
+      "- **Google Drive** — search, list, read, create, move, and delete files and folders"
+    );
+  }
+  if (has(enabled, "google_sheets")) {
+    capabilities.push(
+      "- **Google Sheets** — create spreadsheets, read/write ranges, append rows, and manage sheet data"
+    );
+  }
 
   const capabilitiesSection =
     capabilities.length > 0
@@ -238,6 +248,35 @@ export function buildSystemPrompt(
 `
     : "";
 
+  // ── Google Drive guidelines ────────────────────────────────────────
+  const gdriveGuidance = has(enabled, "google_drive")
+    ? `
+## Google Drive
+- Use \`gdrive_search\` to find files by name or content
+- Use \`gdrive_list_files\` to browse folder contents
+- Use \`gdrive_read_file\` to read text content — works with Google Docs (exported as text), Sheets (as CSV), and plain text files
+- Use \`gdrive_create_file\` to create Google Docs, Sheets, folders, or text files with optional initial content
+- Use \`gdrive_move_file\` to rename or reorganize files into different folders
+- Use \`gdrive_delete_file\` to trash files (recoverable from trash)
+- When the user mentions a document or file, search for it first rather than asking for IDs
+`
+    : "";
+
+  // ── Google Sheets guidelines ─────────────────────────────────────
+  const gsheetsGuidance = has(enabled, "google_sheets")
+    ? `
+## Google Sheets
+- Use \`gsheets_read\` to read data from a sheet range (A1 notation, e.g. "Sheet1!A1:D10" or just "Sheet1")
+- Use \`gsheets_write\` to overwrite a specific range with new data
+- Use \`gsheets_append\` to add new rows at the bottom of a sheet — ideal for logging, tracking, or accumulating data
+- Use \`gsheets_create\` to create a new spreadsheet with optional sheet names and headers
+- Use \`gsheets_get_info\` to see sheet names, row/column counts
+- Use \`gsheets_clear\` to erase data from a range while keeping formatting
+- When reading data, the first row is typically headers — use it to understand the column structure
+- For A1 notation: "Sheet1!A1:C10" reads columns A-C rows 1-10, "Sheet1" reads the entire sheet
+`
+    : "";
+
   // ── Slack guidelines ───────────────────────────────────────────────
   const slackGuidance = has(enabled, "slack")
     ? `
@@ -273,7 +312,7 @@ Tell them: *"Go to your agent's Settings page, scroll to Custom HTTP Tools, and 
 `
     : "";
 
-  return `${agentConfig.systemPrompt}${conversationHistory}${memorySection}${tabSection}${knowledgeBaseSection}${customToolSection}${schedulesSection}${automationsSection}${capabilitiesSection}${autonomySection}${scheduleGuidance}${automationGuidance}${agentMessageGuidance}${notionGuidance}${slackGuidance}${gcalGuidance}${customToolGuidance}
+  return `${agentConfig.systemPrompt}${conversationHistory}${memorySection}${tabSection}${knowledgeBaseSection}${customToolSection}${schedulesSection}${automationsSection}${capabilitiesSection}${autonomySection}${scheduleGuidance}${automationGuidance}${agentMessageGuidance}${notionGuidance}${slackGuidance}${gcalGuidance}${gdriveGuidance}${gsheetsGuidance}${customToolGuidance}
 ## Interactive Questions
 When you need the user to choose between options (onboarding, preferences, configuration), use the \`ask_questions\` tool INSTEAD of writing numbered questions in plain text. This renders clickable option cards the user can select from. Do NOT duplicate the questions in your text — the tool handles display. Use this whenever you'd otherwise write "do you want A, B, or C?"
 

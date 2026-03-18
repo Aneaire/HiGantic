@@ -98,6 +98,16 @@ const SECTIONS: DocSection[] = [
         title: "Google Calendar",
         content: <GCalContent />,
       },
+      {
+        id: "google-drive",
+        title: "Google Drive",
+        content: <GDriveContent />,
+      },
+      {
+        id: "google-sheets",
+        title: "Google Sheets",
+        content: <GSheetsContent />,
+      },
     ],
   },
   {
@@ -454,6 +464,8 @@ function QuickStartContent() {
           ["Notion", "Search, read, create & update Notion pages/databases"],
           ["Slack", "Send messages, read channels, search & react in Slack"],
           ["Google Calendar", "List events, schedule meetings, check availability"],
+          ["Google Drive", "Search, read, create & manage files and folders"],
+          ["Google Sheets", "Read, write & manage spreadsheet data"],
         ]}
       />
 
@@ -490,6 +502,10 @@ function QuickStartContent() {
       <DocH3>Google Calendar</DocH3>
       <DocP>
         Enable "Google Calendar", then add your OAuth Client ID, Client Secret, and Refresh Token in <strong className="text-zinc-200">Settings</strong>. Your agent can then list events, schedule meetings, check availability, and manage your calendar.
+      </DocP>
+      <DocH3>Google Drive & Sheets</DocH3>
+      <DocP>
+        Enable "Google Drive" and/or "Google Sheets" and add your OAuth credentials. You can reuse the same Client ID and Secret from your Google Cloud project — just add the appropriate API scopes when generating the refresh token.
       </DocP>
     </div>
   );
@@ -776,6 +792,8 @@ function AutomationsContent() {
         ["slack.message_sent", "A message is posted to Slack"],
         ["gcal.event_created", "A Google Calendar event is created"],
         ["gcal.event_updated", "A Google Calendar event is modified"],
+        ["gdrive.file_created", "A Google Drive file is created"],
+        ["gsheets.data_written", "Data is written to a Google Sheet"],
       ]} />
 
       <DocH2>Actions</DocH2>
@@ -1192,6 +1210,143 @@ function GCalContent() {
   );
 }
 
+function GDriveContent() {
+  return (
+    <div>
+      <DocH1>Google Drive</DocH1>
+      <div className="flex gap-2 mb-4">
+        <DocBadge>Tool set: google_drive</DocBadge>
+        <DocBadge>Default: Disabled</DocBadge>
+        <DocBadge>Requires: Google OAuth Credentials</DocBadge>
+      </div>
+      <DocP>
+        Connect your agent to Google Drive to search, read, create, and manage files and folders. Your agent can access Google Docs, Sheets, PDFs, text files, and more.
+      </DocP>
+
+      <DocH2>Setup</DocH2>
+      <DocP>
+        Use the same Google Cloud project as Calendar/Sheets. Enable the <strong className="text-zinc-200">Google Drive API</strong> and generate a refresh token with the <code className="text-zinc-200 bg-zinc-800 px-1 rounded">https://www.googleapis.com/auth/drive</code> scope. You can reuse the same Client ID and Secret.
+      </DocP>
+
+      <DocH2>Tools</DocH2>
+      <DocTable
+        headers={["Tool", "Description"]}
+        rows={[
+          ["gdrive_search", "Search files by name or content with optional MIME type filter"],
+          ["gdrive_list_files", "List files in a folder (defaults to root)"],
+          ["gdrive_read_file", "Read text content — Docs export as text, Sheets as CSV"],
+          ["gdrive_create_file", "Create Google Docs, Sheets, folders, or text files"],
+          ["gdrive_move_file", "Move files between folders or rename them"],
+          ["gdrive_delete_file", "Move a file to trash (recoverable)"],
+        ]}
+      />
+
+      <DocH2>Reading Files</DocH2>
+      <DocP>
+        Google Workspace files (Docs, Sheets, Slides) are automatically exported to readable formats. Regular files (txt, csv, json, etc.) are downloaded directly. Very large files are truncated to 15,000 characters.
+      </DocP>
+
+      <DocH2>Events</DocH2>
+      <DocTable
+        headers={["Event", "When"]}
+        rows={[
+          ["gdrive.file_created", "A new file or folder is created"],
+          ["gdrive.file_deleted", "A file is moved to trash"],
+        ]}
+      />
+
+      <DocH2>Example</DocH2>
+      <DocP>
+        <strong className="text-zinc-200">User:</strong> "Find the Q1 report in my Drive and summarize it"
+      </DocP>
+      <DocP>
+        <strong className="text-zinc-200">Agent:</strong> Searches Drive for "Q1 report", reads the document content, and provides a summary.
+      </DocP>
+
+      <DocH2>Integration Ideas</DocH2>
+      <DocP>
+        Pair with <AppLink to="/docs/tools/google-sheets">Google Sheets</AppLink> for data workflows. Use with <AppLink to="/docs/tools/schedules">Scheduled Actions</AppLink> to generate weekly report documents. Combine with <AppLink to="/docs/tools/slack">Slack</AppLink> to share Drive links in channels.
+      </DocP>
+    </div>
+  );
+}
+
+function GSheetsContent() {
+  return (
+    <div>
+      <DocH1>Google Sheets</DocH1>
+      <div className="flex gap-2 mb-4">
+        <DocBadge>Tool set: google_sheets</DocBadge>
+        <DocBadge>Default: Disabled</DocBadge>
+        <DocBadge>Requires: Google OAuth Credentials</DocBadge>
+      </div>
+      <DocP>
+        Connect your agent to Google Sheets to read, write, and manage spreadsheet data. Perfect for data tracking, reporting, logging, and building data pipelines.
+      </DocP>
+
+      <DocH2>Setup</DocH2>
+      <DocP>
+        Use the same Google Cloud project. Enable the <strong className="text-zinc-200">Google Sheets API</strong> and generate a refresh token with the <code className="text-zinc-200 bg-zinc-800 px-1 rounded">https://www.googleapis.com/auth/spreadsheets</code> scope.
+      </DocP>
+
+      <DocH2>Tools</DocH2>
+      <DocTable
+        headers={["Tool", "Description"]}
+        rows={[
+          ["gsheets_create", "Create a new spreadsheet with optional sheet names and headers"],
+          ["gsheets_get_info", "Get spreadsheet metadata — sheet names, row/column counts"],
+          ["gsheets_read", "Read data from a range (A1 notation)"],
+          ["gsheets_write", "Write/overwrite data in a specific range"],
+          ["gsheets_append", "Append rows to the end of a sheet"],
+          ["gsheets_clear", "Clear values from a range (keeps formatting)"],
+        ]}
+      />
+
+      <DocH2>A1 Notation</DocH2>
+      <DocP>
+        Ranges use standard spreadsheet notation:
+      </DocP>
+      <DocCode>{`Sheet1!A1:D10   — Columns A-D, rows 1-10
+Sheet1!A:C      — All of columns A-C
+Sheet1          — Entire sheet
+A1:B5           — First sheet, A1 to B5`}</DocCode>
+
+      <DocH2>Reading Data</DocH2>
+      <DocP>
+        The <code className="text-zinc-200 bg-zinc-800 px-1 rounded">gsheets_read</code> tool returns data as a structured object with headers (first row) and rows. The agent can interpret column structure and answer questions about the data.
+      </DocP>
+
+      <DocH2>Writing Data</DocH2>
+      <DocP>
+        Use <code className="text-zinc-200 bg-zinc-800 px-1 rounded">gsheets_write</code> to overwrite a specific range, or <code className="text-zinc-200 bg-zinc-800 px-1 rounded">gsheets_append</code> to add rows at the bottom. Values are interpreted automatically — numbers, dates, and formulas are parsed.
+      </DocP>
+
+      <DocH2>Events</DocH2>
+      <DocTable
+        headers={["Event", "When"]}
+        rows={[
+          ["gsheets.spreadsheet_created", "A new spreadsheet is created"],
+          ["gsheets.data_written", "Data is written to a range"],
+          ["gsheets.rows_appended", "Rows are appended to a sheet"],
+        ]}
+      />
+
+      <DocH2>Example</DocH2>
+      <DocP>
+        <strong className="text-zinc-200">User:</strong> "Create an expense tracker spreadsheet with columns Date, Description, Amount, Category, and add my lunch expense of $15 today"
+      </DocP>
+      <DocP>
+        <strong className="text-zinc-200">Agent:</strong> Creates the spreadsheet with headers, then appends a row with today's date, "Lunch", 15, and "Food".
+      </DocP>
+
+      <DocH2>Integration Ideas</DocH2>
+      <DocP>
+        Use with <AppLink to="/docs/tools/schedules">Scheduled Actions</AppLink> for daily data collection (e.g., "every day, fetch API metrics and append to the tracking sheet"). Combine with <AppLink to="/docs/tools/email">Email</AppLink> to send spreadsheet summaries. Pair with <AppLink to="/docs/tools/automations">Automations</AppLink> to log events automatically.
+      </DocP>
+    </div>
+  );
+}
+
 function EventBusContent() {
   return (
     <div>
@@ -1229,6 +1384,11 @@ function EventBusContent() {
         ["gcal.event_created", "A Google Calendar event is created"],
         ["gcal.event_updated", "A Google Calendar event is modified"],
         ["gcal.event_deleted", "A Google Calendar event is deleted"],
+        ["gdrive.file_created", "A Google Drive file or folder is created"],
+        ["gdrive.file_deleted", "A Google Drive file is moved to trash"],
+        ["gsheets.spreadsheet_created", "A Google Sheets spreadsheet is created"],
+        ["gsheets.data_written", "Data is written to a Google Sheet"],
+        ["gsheets.rows_appended", "Rows are appended to a Google Sheet"],
       ]} />
 
       <DocH2>Example: Chain Actions Together</DocH2>
@@ -1284,6 +1444,8 @@ function ToolSetsRefContent() {
           ["Notion", "notion", "Disabled", "All"],
           ["Slack", "slack", "Disabled", "All"],
           ["Google Calendar", "google_calendar", "Disabled", "All"],
+          ["Google Drive", "google_drive", "Disabled", "All"],
+          ["Google Sheets", "google_sheets", "Disabled", "All"],
           ["REST API", "rest_api", "Disabled", "Pro+"],
           ["PostgreSQL", "postgres", "Disabled", "Pro+"],
         ]}
@@ -1326,6 +1488,11 @@ function EventTypesContent() {
           ["gcal.event_created", "eventId, title, start, end"],
           ["gcal.event_updated", "eventId, updatedFields"],
           ["gcal.event_deleted", "eventId"],
+          ["gdrive.file_created", "fileId, name, type"],
+          ["gdrive.file_deleted", "fileId"],
+          ["gsheets.spreadsheet_created", "spreadsheetId, title"],
+          ["gsheets.data_written", "spreadsheetId, range, rowCount"],
+          ["gsheets.rows_appended", "spreadsheetId, rowCount"],
         ]}
       />
 

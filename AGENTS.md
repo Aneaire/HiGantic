@@ -17,7 +17,7 @@ Monorepo with 3 packages:
 
 ## Tool Sets (enabledToolSets)
 
-`memory`, `web_search`, `pages`, `custom_http_tools`, `email`, `rag`, `schedules`, `automations`, `timers`, `webhooks`, `agent_messages`, `notion`, `slack`, `google_calendar`
+`memory`, `web_search`, `pages`, `custom_http_tools`, `email`, `rag`, `schedules`, `automations`, `timers`, `webhooks`, `agent_messages`, `notion`, `slack`, `google_calendar`, `google_drive`, `google_sheets`
 
 ## Key Patterns
 
@@ -122,6 +122,8 @@ Tools are registered via MCP using `create*Tools()` functions, gated by `enabled
 | `notion` | `notion-tools.ts` | `notion_search`, `notion_query_database`, `notion_create_page`, `notion_update_page`, `notion_get_page`, `notion_append_blocks` |
 | `slack` | `slack-tools.ts` | `slack_send_message`, `slack_list_channels`, `slack_read_messages`, `slack_add_reaction`, `slack_set_topic`, `slack_search_messages` |
 | `google_calendar` | `gcal-tools.ts` | `gcal_list_calendars`, `gcal_list_events`, `gcal_create_event`, `gcal_update_event`, `gcal_delete_event`, `gcal_find_free_time` |
+| `google_drive` | `gdrive-tools.ts` | `gdrive_search`, `gdrive_list_files`, `gdrive_read_file`, `gdrive_create_file`, `gdrive_move_file`, `gdrive_delete_file` |
+| `google_sheets` | `gsheets-tools.ts` | `gsheets_create`, `gsheets_get_info`, `gsheets_read`, `gsheets_write`, `gsheets_append`, `gsheets_clear` |
 | (always on) | `suggest-tools.ts` | `suggest_replies`, `ask_questions` — core UX, not gated |
 
 ### Allowed Tools (`buildAllowedTools`)

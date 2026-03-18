@@ -203,6 +203,16 @@ export async function runAgent(params: RunAgentParams) {
       ? await convexClient.getToolConfig(params.agentId, "google_calendar")
       : null;
 
+    // Load Google Drive config if google_drive tool is enabled
+    const gdriveConfig = enabled.includes("google_drive")
+      ? await convexClient.getToolConfig(params.agentId, "google_drive")
+      : null;
+
+    // Load Google Sheets config if google_sheets tool is enabled
+    const gsheetsConfig = enabled.includes("google_sheets")
+      ? await convexClient.getToolConfig(params.agentId, "google_sheets")
+      : null;
+
     // Load schedules context if schedules tool is enabled
     const schedules = enabled.includes("schedules")
       ? await convexClient.listSchedules(params.agentId)
@@ -243,6 +253,8 @@ export async function runAgent(params: RunAgentParams) {
       notionConfig: notionConfig as any,
       slackConfig: slackConfig as any,
       gcalConfig: gcalConfig as any,
+      gdriveConfig: gdriveConfig as any,
+      gsheetsConfig: gsheetsConfig as any,
     });
 
     const allowedTools = buildAllowedTools(
