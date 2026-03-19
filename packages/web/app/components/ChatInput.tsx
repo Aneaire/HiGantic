@@ -1,14 +1,16 @@
 import { useState, useRef } from "react";
-import { ArrowUp, Square, MessageSquare, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowUp, Square, MessageSquare, ChevronDown, ChevronUp, Eye, Brain } from "lucide-react";
 
-const MODELS = [
-  { value: "claude-sonnet-4-6", label: "Sonnet 4.6", group: "Claude" },
-  { value: "claude-opus-4-6", label: "Opus 4.6", group: "Claude" },
-  { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5", group: "Claude" },
-  { value: "gemini-3.1-pro", label: "Gemini 3.1 Pro", group: "Gemini" },
-  { value: "gemini-3-flash", label: "Gemini 3 Flash", group: "Gemini" },
-  { value: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash-Lite", group: "Gemini" },
-  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", group: "Gemini" },
+type ModelCapability = "vision" | "thinking";
+
+const MODELS: { value: string; label: string; group: string; capabilities: ModelCapability[] }[] = [
+  { value: "claude-sonnet-4-6", label: "Sonnet 4.6", group: "Claude", capabilities: ["vision", "thinking"] },
+  { value: "claude-opus-4-6", label: "Opus 4.6", group: "Claude", capabilities: ["vision", "thinking"] },
+  { value: "claude-haiku-4-5-20251001", label: "Haiku 4.5", group: "Claude", capabilities: ["vision"] },
+  { value: "gemini-3.1-pro", label: "Gemini 3.1 Pro", group: "Gemini", capabilities: ["vision", "thinking"] },
+  { value: "gemini-3-flash", label: "Gemini 3 Flash", group: "Gemini", capabilities: ["vision", "thinking"] },
+  { value: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash-Lite", group: "Gemini", capabilities: ["vision"] },
+  { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", group: "Gemini", capabilities: ["vision", "thinking"] },
 ];
 
 function getModelLabel(value: string) {
@@ -68,13 +70,21 @@ function ModelDropdown({
                     onModelChange(m.value);
                     setOpen(false);
                   }}
-                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                  className={`w-full flex items-center justify-between px-3 py-1.5 text-xs transition-colors ${
                     m.value === model
                       ? "bg-neon-400/10 text-neon-400"
                       : "text-zinc-300 hover:bg-zinc-800"
                   }`}
                 >
-                  {m.label}
+                  <span>{m.label}</span>
+                  <span className="flex items-center gap-1">
+                    {m.capabilities.includes("vision") && (
+                      <Eye className="h-3 w-3 text-blue-400" title="Vision" />
+                    )}
+                    {m.capabilities.includes("thinking") && (
+                      <Brain className="h-3 w-3 text-pink-400" title="Thinking" />
+                    )}
+                  </span>
                 </button>
               ))}
             </div>

@@ -20,6 +20,11 @@ import {
   FileText,
   RotateCcw,
   Check,
+  Eye,
+  Brain,
+  Code,
+  Type,
+  ImagePlus,
 } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect, useRef } from "react";
@@ -1103,7 +1108,7 @@ function DocumentsSection({ agent }: { agent: Doc<"agents"> }) {
 
 // ── Model Capability Badges ──────────────────────────────────────────
 
-type ModelCapability = "text" | "vision" | "image_gen" | "code";
+type ModelCapability = "text" | "vision" | "image_gen" | "code" | "thinking";
 
 interface ModelDef {
   id: string;
@@ -1121,7 +1126,7 @@ const MODELS: ModelDef[] = [
     name: "Claude Sonnet 4.6",
     description: "Balanced speed and capability",
     provider: "Anthropic",
-    capabilities: ["text", "vision", "code"],
+    capabilities: ["text", "vision", "thinking", "code"],
     tier: "$$",
   },
   {
@@ -1129,7 +1134,7 @@ const MODELS: ModelDef[] = [
     name: "Claude Opus 4.6",
     description: "Most capable Claude model",
     provider: "Anthropic",
-    capabilities: ["text", "vision", "code"],
+    capabilities: ["text", "vision", "thinking", "code"],
     tier: "$$$",
   },
   {
@@ -1146,7 +1151,7 @@ const MODELS: ModelDef[] = [
     name: "Gemini 3.1 Pro",
     description: "Most capable Gemini model",
     provider: "Google",
-    capabilities: ["text", "vision", "code", "image_gen"],
+    capabilities: ["text", "vision", "thinking", "code", "image_gen"],
     tier: "$$$",
   },
   {
@@ -1154,7 +1159,7 @@ const MODELS: ModelDef[] = [
     name: "Gemini 3 Flash",
     description: "Fast and agentic",
     provider: "Google",
-    capabilities: ["text", "vision", "code", "image_gen"],
+    capabilities: ["text", "vision", "thinking", "code", "image_gen"],
     tier: "$$",
   },
   {
@@ -1170,19 +1175,28 @@ const MODELS: ModelDef[] = [
     name: "Gemini 2.5 Flash",
     description: "Balanced Gemini model",
     provider: "Google",
-    capabilities: ["text", "vision", "code"],
+    capabilities: ["text", "vision", "thinking", "code"],
     tier: "$$",
   },
 ];
 
+const CAPABILITY_ICONS: Record<ModelCapability, React.ComponentType<{ className?: string }>> = {
+  text: Type,
+  vision: Eye,
+  thinking: Brain,
+  code: Code,
+  image_gen: ImagePlus,
+};
+
 const CAPABILITY_CONFIG: Record<
   ModelCapability,
-  { label: string; color: string; icon: string }
+  { label: string; color: string }
 > = {
-  text: { label: "Text", color: "bg-emerald-500/20 text-emerald-400 ring-emerald-500/30", icon: "T" },
-  vision: { label: "Vision", color: "bg-blue-500/20 text-blue-400 ring-blue-500/30", icon: "V" },
-  image_gen: { label: "Image Gen", color: "bg-violet-500/20 text-violet-400 ring-violet-500/30", icon: "I" },
-  code: { label: "Code", color: "bg-amber-500/20 text-amber-400 ring-amber-500/30", icon: "C" },
+  text: { label: "Text", color: "bg-emerald-500/20 text-emerald-400 ring-emerald-500/30" },
+  vision: { label: "Vision", color: "bg-blue-500/20 text-blue-400 ring-blue-500/30" },
+  thinking: { label: "Thinking", color: "bg-pink-500/20 text-pink-400 ring-pink-500/30" },
+  code: { label: "Code", color: "bg-amber-500/20 text-amber-400 ring-amber-500/30" },
+  image_gen: { label: "Image Gen", color: "bg-violet-500/20 text-violet-400 ring-violet-500/30" },
 };
 
 function ModelSelector({
@@ -1216,12 +1230,19 @@ function ModelSelector({
             </div>
             <div className="flex items-center gap-1.5 mt-1">
               {selected.capabilities.map((cap) => (
-                <span
-                  key={cap}
-                  className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium ring-1 ${CAPABILITY_CONFIG[cap].color}`}
-                >
-                  {CAPABILITY_CONFIG[cap].label}
-                </span>
+                (() => {
+                  const Icon = CAPABILITY_ICONS[cap];
+                  return (
+                    <span
+                      key={cap}
+                      title={CAPABILITY_CONFIG[cap].label}
+                      className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium ring-1 ${CAPABILITY_CONFIG[cap].color}`}
+                    >
+                      <Icon className="h-2.5 w-2.5" />
+                      {CAPABILITY_CONFIG[cap].label}
+                    </span>
+                  );
+                })()
               ))}
             </div>
           </div>
