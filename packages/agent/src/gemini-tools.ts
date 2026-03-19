@@ -17,6 +17,12 @@ interface CustomToolConfig {
   headers?: Record<string, string>;
 }
 
+interface ImageGenConfig {
+  provider: "gemini" | "nano_banana";
+  geminiApiKey?: string;
+  nanoBananaApiKey?: string;
+}
+
 interface GeminiToolDeps {
   convexClient: AgentConvexClient;
   agentId: string;
@@ -24,6 +30,8 @@ interface GeminiToolDeps {
   enabledToolSets: string[];
   tabs: Tab[];
   customTools: CustomToolConfig[];
+  imageGenConfig?: ImageGenConfig | null;
+  imageGenModel?: string;
 }
 
 export interface GeminiFunctionDeclaration {
@@ -40,6 +48,17 @@ export type ToolHandler = (args: Record<string, any>) => Promise<string>;
 
 function has(sets: string[], name: string): boolean {
   return sets.includes(name);
+}
+
+function getAspectRatio(width: number, height: number): string {
+  const ratio = width / height;
+  if (ratio >= 1.7) return "16:9";
+  if (ratio >= 1.4) return "3:2";
+  if (ratio >= 1.2) return "4:3";
+  if (ratio >= 0.9) return "1:1";
+  if (ratio >= 0.7) return "3:4";
+  if (ratio >= 0.6) return "2:3";
+  return "9:16";
 }
 
 function tabDescription(tabs: Tab[]): string {
@@ -684,42 +703,108 @@ export function buildGeminiTools(deps: GeminiToolDeps): {
     });
     handlers.generate_image = async (args) => {
       try {
-        // This handler delegates to the image gen config loaded at runtime
-        // The actual generation happens via the MCP tool in Claude mode,
-        // but for Gemini we use the Imagen API directly
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (!apiKey) return "Error: GEMINI_API_KEY not configured";
+        // Determine provider: imageGenModel setting (user's choice) > explicit input > config default
+        let provider: "gemini" | "nano_banana" | undefined;
+        let modelOverride: string | undefined;
+        const imgConfig = deps.imageGenConfig;
 
-        const model = "imagen-4.0-generate-001";
-        const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${apiKey}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              instances: [{ prompt: args.prompt }],
-              parameters: { sampleCount: 1 },
-            }),
+        if (deps.imageGenModel) {
+          const [p, m] = deps.imageGenModel.split(":");
+          if (p === "gemini" || p === "nano_banana") {
+            provider = p;
+            modelOverride = m;
           }
-        );
-
-        if (!res.ok) {
-          const err = await res.text();
-          return `Image generation failed (${res.status}): ${err}`;
+        }
+        if (!provider) {
+          provider = (args.provider as "gemini" | "nano_banana") || imgConfig?.provider || "gemini";
         }
 
-        const data = await res.json();
-        const prediction = data.predictions?.[0];
-        if (!prediction?.bytesBase64Encoded) {
-          return "No image returned from Imagen API";
+        const geminiApiKey = imgConfig?.geminiApiKey || process.env.GEMINI_API_KEY;
+        const nanoBananaApiKey = imgConfig?.nanoBananaApiKey;
+
+        let imageBase64: string;
+        let mimeType: string;
+        let modelUsed: string;
+
+        if (provider === "nano_banana") {
+          if (!nanoBananaApiKey) return "Error: Nano Banana API key not configured. Add it in Settings > Credentials.";
+          modelUsed = "nano_banana_generate_2";
+
+          // Submit generation task
+          const aspectRatio = args.width && args.height
+            ? getAspectRatio(args.width, args.height) : "1:1";
+          const submitRes = await fetch("https://api.nanobananaapi.ai/api/v1/nanobanana/generate-2", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${nanoBananaApiKey}` },
+            body: JSON.stringify({ prompt: args.prompt, aspectRatio, resolution: "1K", outputFormat: "png" }),
+          });
+          if (!submitRes.ok) {
+            const err = await submitRes.text();
+            return `Nano Banana API error (${submitRes.status}): ${err}`;
+          }
+          const submitData = await submitRes.json();
+          const taskId = submitData.data?.taskId;
+          if (!taskId) return "No taskId returned from Nano Banana API";
+
+          // Poll for completion
+          let imageUrl: string | undefined;
+          for (let i = 0; i < 60; i++) {
+            await new Promise((r) => setTimeout(r, 3000));
+            const pollRes = await fetch(
+              `https://api.nanobananaapi.ai/api/v1/nanobanana/record-info?taskId=${encodeURIComponent(taskId)}`,
+              { headers: { Authorization: `Bearer ${nanoBananaApiKey}` } }
+            );
+            if (!pollRes.ok) continue;
+            const pollData = await pollRes.json();
+            const status = pollData.data?.successFlag ?? pollData.successFlag;
+            if (status === 1) {
+              imageUrl = pollData.data?.response?.resultImageUrl ?? pollData.response?.resultImageUrl;
+              break;
+            } else if (status === 2 || status === 3) {
+              const errMsg = pollData.data?.errorMessage ?? pollData.errorMessage ?? "Unknown error";
+              return `Nano Banana generation failed: ${errMsg}`;
+            }
+          }
+          if (!imageUrl) return "Nano Banana image generation timed out";
+
+          const imgRes = await fetch(imageUrl);
+          if (!imgRes.ok) return `Failed to download generated image: ${imgRes.status}`;
+          const buf = await imgRes.arrayBuffer();
+          imageBase64 = Buffer.from(buf).toString("base64");
+          mimeType = imgRes.headers.get("content-type") || "image/png";
+        } else {
+          // Gemini Imagen
+          if (!geminiApiKey) return "Error: GEMINI_API_KEY not configured";
+          modelUsed = modelOverride || "imagen-4.0-generate-001";
+
+          const res = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelUsed}:predict?key=${geminiApiKey}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                instances: [{ prompt: args.prompt }],
+                parameters: { sampleCount: 1 },
+              }),
+            }
+          );
+          if (!res.ok) {
+            const err = await res.text();
+            return `Image generation failed (${res.status}): ${err}`;
+          }
+          const data = await res.json();
+          const prediction = data.predictions?.[0];
+          if (!prediction?.bytesBase64Encoded) return "No image returned from Imagen API";
+          imageBase64 = prediction.bytesBase64Encoded;
+          mimeType = prediction.mimeType || "image/png";
         }
 
         // Upload to Convex storage
         const uploadUrl = await deps.convexClient.getAssetUploadUrl();
-        const buffer = Buffer.from(prediction.bytesBase64Encoded, "base64");
+        const buffer = Buffer.from(imageBase64, "base64");
         const uploadRes = await fetch(uploadUrl, {
           method: "POST",
-          headers: { "Content-Type": prediction.mimeType || "image/png" },
+          headers: { "Content-Type": mimeType },
           body: buffer,
         });
         if (!uploadRes.ok) return `Upload failed: ${uploadRes.status}`;
@@ -730,11 +815,11 @@ export function buildGeminiTools(deps: GeminiToolDeps): {
           name: args.name,
           type: "image",
           storageId,
-          mimeType: prediction.mimeType || "image/png",
+          mimeType,
           fileSize: buffer.length,
-          generatedBy: "gemini",
+          generatedBy: provider,
           prompt: args.prompt,
-          model,
+          model: modelUsed,
           width: args.width || 1024,
           height: args.height || 1024,
         });
@@ -743,7 +828,7 @@ export function buildGeminiTools(deps: GeminiToolDeps): {
           deps.agentId,
           "image.generated",
           "image_gen_tools",
-          { assetId, name: args.name, provider: "gemini", prompt: args.prompt }
+          { assetId, name: args.name, provider, prompt: args.prompt }
         );
 
         return `Image "${args.name}" generated and saved to assets (ID: ${assetId}).`;

@@ -164,154 +164,151 @@ export function createImageGenTools(
   config: ImageGenConfig,
   imageGenModel?: string
 ) {
-  const tools = [];
+  const generateImage = tool(
+    "generate_image",
+    "Generate an image from a text prompt using AI. The image is saved to the agent's assets library. Returns the asset ID and URL.",
+    {
+      prompt: z
+        .string()
+        .describe("Detailed description of the image to generate. Be specific about style, composition, colors, lighting, and subject matter."),
+      name: z
+        .string()
+        .describe("A short descriptive name for the image (used as filename)"),
+      provider: z
+        .enum(["gemini", "nano_banana"])
+        .optional()
+        .describe("Which provider to use. Defaults based on config."),
+      width: z.number().optional().describe("Image width in pixels (default: 1024)"),
+      height: z.number().optional().describe("Image height in pixels (default: 1024)"),
+      folder_id: z
+        .string()
+        .optional()
+        .describe("Optional folder ID to save the image in"),
+    },
+    async (input) => {
+      // Determine provider: imageGenModel setting (user's choice) > explicit input > config default > auto-detect
+      let provider: string | undefined;
+      let modelOverride: string | undefined;
 
-  tools.push(
-    tool({
-      name: "generate_image",
-      description:
-        "Generate an image from a text prompt using AI. The image is saved to the agent's assets library. Returns the asset ID and URL.",
-      schema: z.object({
-        prompt: z
-          .string()
-          .describe("Detailed description of the image to generate. Be specific about style, composition, colors, lighting, and subject matter."),
-        name: z
-          .string()
-          .describe("A short descriptive name for the image (used as filename)"),
-        provider: z
-          .enum(["gemini", "nano_banana"])
-          .optional()
-          .describe("Which provider to use. Defaults based on config."),
-        width: z.number().optional().describe("Image width in pixels (default: 1024)"),
-        height: z.number().optional().describe("Image height in pixels (default: 1024)"),
-        folder_id: z
-          .string()
-          .optional()
-          .describe("Optional folder ID to save the image in"),
-      }),
-      execute: async (input) => {
-        // Determine provider: explicit input > imageGenModel setting > config default > auto-detect from keys
-        let provider = input.provider || config.provider;
-        let modelOverride: string | undefined;
-
-        // Use imageGenModel setting if no explicit provider in input
-        if (!input.provider && imageGenModel) {
-          const [p, m] = imageGenModel.split(":");
-          if (p === "gemini" || p === "nano_banana") {
-            provider = p;
-            modelOverride = m;
-          }
+      // imageGenModel is the user's preferred image gen model from settings — highest priority
+      if (imageGenModel) {
+        const [p, m] = imageGenModel.split(":");
+        if (p === "gemini" || p === "nano_banana") {
+          provider = p;
+          modelOverride = m;
         }
+      }
 
-        // Resolve API keys: credential system first, then env var fallback
-        const geminiApiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
-        const nanoBananaApiKey = config.nanoBananaApiKey;
+      // Fall back to explicit tool input, then config default
+      if (!provider) {
+        provider = input.provider || config.provider;
+      }
 
-        // Auto-detect provider from available API keys if still not set
-        if (!provider) {
-          if (nanoBananaApiKey) provider = "nano_banana";
-          else if (geminiApiKey) provider = "gemini";
+      // Resolve API keys: credential system first, then env var fallback
+      const geminiApiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
+      const nanoBananaApiKey = config.nanoBananaApiKey;
+
+      // Auto-detect provider from available API keys if still not set
+      if (!provider) {
+        if (nanoBananaApiKey) provider = "nano_banana";
+        else if (geminiApiKey) provider = "gemini";
+      }
+
+      let result: { imageBase64: string; mimeType: string };
+      let modelUsed: string;
+
+      if (provider === "gemini") {
+        if (!geminiApiKey) {
+          return {
+            content: [{ type: "text" as const, text: "Error: Gemini API key not configured. Set GEMINI_API_KEY or add it in Settings > Image Generation." }],
+          };
         }
-
-        let result: { imageBase64: string; mimeType: string };
-        let modelUsed: string;
-
-        if (provider === "gemini") {
-          if (!geminiApiKey) {
-            return { error: "Gemini API key not configured. Set GEMINI_API_KEY or add it in Settings > Image Generation." };
-          }
-          modelUsed = modelOverride || "imagen-4.0-generate-001";
-          result = await generateWithGemini(geminiApiKey, input.prompt, {
-            width: input.width,
-            height: input.height,
-            model: modelUsed,
-          });
-        } else if (provider === "nano_banana") {
-          if (!nanoBananaApiKey) {
-            return { error: "Nano Banana API key not configured. Add it in Settings > Image Generation." };
-          }
-          modelUsed = "nano_banana_generate_2";
-          result = await generateWithNanoBanana(
-            nanoBananaApiKey,
-            input.prompt,
-            { width: input.width, height: input.height }
-          );
-        } else {
-          return { error: `Unknown provider: ${provider}` };
-        }
-
-        // Upload to Convex storage
-        const storageId = await uploadBase64ToConvex(
-          convexClient,
-          result.imageBase64,
-          result.mimeType
-        );
-
-        // Create asset record
-        const assetId = await convexClient.createAsset(agentId, {
-          name: input.name,
-          type: "image",
-          storageId,
-          mimeType: result.mimeType,
-          fileSize: Buffer.from(result.imageBase64, "base64").length,
-          generatedBy: provider,
-          prompt: input.prompt,
+        modelUsed = modelOverride || "imagen-4.0-generate-001";
+        result = await generateWithGemini(geminiApiKey, input.prompt, {
+          width: input.width,
+          height: input.height,
           model: modelUsed,
-          width: input.width || 1024,
-          height: input.height || 1024,
-          ...(input.folder_id ? { folderId: input.folder_id } : {}),
         });
-
-        // Emit event
-        await convexClient.emitEvent(agentId, "image.generated", "image_gen_tools", {
-          assetId,
-          name: input.name,
-          provider,
-          prompt: input.prompt,
-        });
-
+      } else if (provider === "nano_banana") {
+        if (!nanoBananaApiKey) {
+          return {
+            content: [{ type: "text" as const, text: "Error: Nano Banana API key not configured. Add it in Settings > Credentials." }],
+          };
+        }
+        modelUsed = "nano_banana_generate_2";
+        result = await generateWithNanoBanana(
+          nanoBananaApiKey,
+          input.prompt,
+          { width: input.width, height: input.height }
+        );
+      } else {
         return {
-          success: true,
-          assetId,
-          name: input.name,
-          provider,
-          message: `Image "${input.name}" generated successfully and saved to assets.`,
+          content: [{ type: "text" as const, text: `Error: Unknown provider: ${provider}` }],
         };
-      },
-    })
+      }
+
+      // Upload to Convex storage
+      const storageId = await uploadBase64ToConvex(
+        convexClient,
+        result.imageBase64,
+        result.mimeType
+      );
+
+      // Create asset record
+      const assetId = await convexClient.createAsset(agentId, {
+        name: input.name,
+        type: "image",
+        storageId,
+        mimeType: result.mimeType,
+        fileSize: Buffer.from(result.imageBase64, "base64").length,
+        generatedBy: provider,
+        prompt: input.prompt,
+        model: modelUsed,
+        width: input.width || 1024,
+        height: input.height || 1024,
+        ...(input.folder_id ? { folderId: input.folder_id } : {}),
+      });
+
+      // Emit event
+      await convexClient.emitEvent(agentId, "image.generated", "image_gen_tools", {
+        assetId,
+        name: input.name,
+        provider,
+        prompt: input.prompt,
+      });
+
+      return {
+        content: [{ type: "text" as const, text: `Image "${input.name}" generated successfully and saved to assets (ID: ${assetId}).` }],
+      };
+    }
   );
 
-  tools.push(
-    tool({
-      name: "list_assets",
-      description: "List all generated images and files in the agent's asset library.",
-      schema: z.object({
-        type: z
-          .enum(["image", "file"])
-          .optional()
-          .describe("Filter by asset type"),
-      }),
-      execute: async (input) => {
-        const assets = await convexClient.listAssets(agentId);
-        const filtered = input.type
-          ? (assets as any[]).filter((a: any) => a.type === input.type)
-          : assets;
+  const listAssets = tool(
+    "list_assets",
+    "List all generated images and files in the agent's asset library.",
+    {
+      type: z
+        .enum(["image", "file"])
+        .optional()
+        .describe("Filter by asset type"),
+    },
+    async (input) => {
+      const assets = await convexClient.listAssets(agentId);
+      const filtered = input.type
+        ? (assets as any[]).filter((a: any) => a.type === input.type)
+        : assets;
 
-        return {
-          count: (filtered as any[]).length,
-          assets: (filtered as any[]).map((a: any) => ({
-            id: a._id,
-            name: a.name,
-            type: a.type,
-            url: a.resolvedUrl || a.url,
-            generatedBy: a.generatedBy,
-            prompt: a.prompt,
-            createdAt: a.createdAt,
-          })),
-        };
-      },
-    })
+      const assetList = (filtered as any[]).map((a: any) =>
+        `- ${a.name} (${a.type}) ${a.generatedBy ? `[${a.generatedBy}]` : ""}`
+      ).join("\n");
+
+      return {
+        content: [{ type: "text" as const, text: `Assets (${(filtered as any[]).length}):\n${assetList || "No assets found."}` }],
+      };
+    }
   );
+
+  const tools = [generateImage, listAssets];
 
   return tools;
 }

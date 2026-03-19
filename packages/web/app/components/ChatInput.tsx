@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import {
   ArrowUp, Square, MessageSquare, ChevronDown, ChevronUp,
-  Eye, Brain, ImagePlus, Search, Lock, Check,
+  Eye, Brain, ImagePlus, Search, Lock, Check, Sparkles,
 } from "lucide-react";
 
 // ── Provider icons ──────────────────────────────────────────────────────
@@ -200,24 +200,38 @@ function ModelDropdown({
     return results;
   }, [search, filter, onImageGenModelChange]);
 
-  const groups = useMemo(() => {
-    const map = new Map<string, AnyModel[]>();
+  // Group into two sections: Agent Brain (chat models) and Image Generation
+  const sections = useMemo(() => {
+    const brainModels: { group: string; models: AnyModel[] }[] = [];
+    const imageGenModels: AnyModel[] = [];
+    const brainGroups = new Map<string, AnyModel[]>();
+
     for (const m of filtered) {
-      const key = m.type === "image_gen" ? "Image Generation" : m.group;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(m);
+      if (m.type === "image_gen") {
+        imageGenModels.push(m);
+      } else {
+        if (!brainGroups.has(m.group)) brainGroups.set(m.group, []);
+        brainGroups.get(m.group)!.push(m);
+      }
     }
-    return map;
+
+    for (const [group, models] of brainGroups) {
+      brainModels.push({ group, models });
+    }
+
+    return { brainModels, imageGenModels };
   }, [filtered]);
 
   const filterTabs: { key: typeof filter; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { key: "all", label: "All", icon: ({ className }) => <span className={className}>*</span> },
-    { key: "Claude", label: "Claude", icon: AnthropicIcon },
-    { key: "Gemini", label: "Gemini", icon: GoogleIcon },
+    { key: "all", label: "All", icon: Sparkles },
   ];
   if (onImageGenModelChange) {
     filterTabs.push({ key: "image_gen", label: "Image", icon: ImagePlus });
   }
+  filterTabs.push(
+    { key: "Claude", label: "Claude", icon: AnthropicIcon },
+    { key: "Gemini", label: "Gemini", icon: GoogleIcon },
+  );
 
   const imageGenLabel = imageGenModel ? getImageGenLabel(imageGenModel) : "";
 
@@ -247,134 +261,183 @@ function ModelDropdown({
 
       {/* Panel */}
       {open && (
-        <div className="absolute bottom-full left-0 mb-2 w-80 max-h-[420px] flex flex-col rounded-2xl border border-zinc-800 bg-zinc-950 backdrop-blur-2xl shadow-2xl shadow-black/60 z-50 overflow-hidden">
-          {/* Search */}
-          <div className="px-3 pt-3 pb-2">
-            <div className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/80 px-3 py-2">
-              <Search className="h-3.5 w-3.5 text-zinc-600 shrink-0" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search models..."
-                autoFocus
-                className="flex-1 bg-transparent text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Filter tabs */}
-          <div className="flex items-center gap-1 px-3 pb-2">
+        <div className="absolute bottom-full left-0 mb-2 w-[370px] h-[420px] flex rounded-2xl border border-zinc-800 bg-zinc-950 backdrop-blur-2xl shadow-2xl shadow-black/60 z-50 overflow-hidden">
+          {/* Sidebar */}
+          <div className="flex flex-col items-center gap-1 py-3 px-1.5 border-r border-zinc-800/60 bg-zinc-950/80">
             {filterTabs.map((tab) => {
               const Icon = tab.icon;
+              const isActive = filter === tab.key;
+              const isImageTab = tab.key === "image_gen";
               return (
                 <button
                   key={tab.key}
                   type="button"
                   onClick={() => setFilter(tab.key)}
-                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[10px] font-medium transition-all ${
-                    filter === tab.key
-                      ? "bg-zinc-800 text-zinc-200"
-                      : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900"
+                  className={`relative flex items-center justify-center h-9 w-9 rounded-xl transition-all ${
+                    isActive
+                      ? isImageTab
+                        ? "bg-violet-500/15 text-violet-400"
+                        : "bg-neon-400/10 text-neon-400"
+                      : "text-zinc-600 hover:text-zinc-400 hover:bg-zinc-800/60"
                   }`}
+                  title={tab.label}
                 >
-                  <Icon className="h-3 w-3" />
-                  {tab.label}
+                  {isActive && (
+                    <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-r-full ${
+                      isImageTab ? "bg-violet-400" : "bg-neon-400"
+                    }`} />
+                  )}
+                  <Icon className="h-4 w-4" />
                 </button>
               );
             })}
           </div>
 
-          {/* Model list */}
-          <div className="flex-1 overflow-y-auto px-2 pb-2">
-            {[...groups.entries()].map(([groupName, models]) => (
-              <div key={groupName}>
-                <div className="sticky top-0 bg-zinc-950/95 backdrop-blur px-2 py-1.5 text-[9px] font-semibold text-zinc-600 uppercase tracking-wider">
-                  {groupName}
+          {/* Content */}
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            {/* Search */}
+            <div className="px-3 pt-3 pb-2">
+              <div className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/80 px-3 py-2">
+                <Search className="h-3.5 w-3.5 text-zinc-600 shrink-0" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search models..."
+                  autoFocus
+                  className="flex-1 bg-transparent text-xs text-zinc-200 placeholder:text-zinc-600 focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Model list */}
+            <div className="flex-1 overflow-y-auto px-2 pb-2">
+              {/* ── Agent Brain section ── */}
+              {sections.brainModels.length > 0 && (
+                <div>
+                  <div className="sticky top-0 z-10 bg-zinc-950/95 backdrop-blur px-2 pt-1 pb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Brain className="h-3 w-3 text-neon-400" />
+                      <span className="text-[9px] font-semibold text-neon-400/80 uppercase tracking-wider">Agent Brain</span>
+                    </div>
+                  </div>
+                  {sections.brainModels.map(({ group, models }) => (
+                    <div key={group}>
+                      <div className="px-2 py-1 text-[9px] font-semibold text-zinc-600 uppercase tracking-wider">
+                        {group}
+                      </div>
+                      {models.map((m) => {
+                        const isSelected = m.value === model;
+                        const ProviderIcon = getProviderIcon(m.group);
+                        return (
+                          <button
+                            key={m.value}
+                            type="button"
+                            onClick={() => onModelChange(m.value)}
+                            className={`w-full flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition-all mb-0.5 ${
+                              isSelected
+                                ? "bg-neon-400/8 ring-1 ring-neon-400/20"
+                                : "hover:bg-zinc-900/80"
+                            }`}
+                          >
+                            <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
+                              isSelected ? "bg-neon-400/10" : "bg-zinc-900"
+                            }`}>
+                              <ProviderIcon className={`h-4 w-4 ${isSelected ? "text-neon-400" : "text-zinc-500"}`} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[13px] font-medium leading-tight ${
+                                  isSelected ? "text-zinc-100" : "text-zinc-300"
+                                }`}>{m.label}</span>
+                                <TierBadge tier={(m as ModelEntry).tier} />
+                              </div>
+                              <p className="text-[11px] mt-0.5 leading-tight text-zinc-500">{m.description}</p>
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              {(m as ModelEntry).capabilities.includes("vision") && (
+                                <Eye className={`h-3.5 w-3.5 ${isSelected ? "text-blue-400" : "text-zinc-700"}`} />
+                              )}
+                              {(m as ModelEntry).capabilities.includes("thinking") && (
+                                <Brain className={`h-3.5 w-3.5 ${isSelected ? "text-pink-400" : "text-zinc-700"}`} />
+                              )}
+                              {isSelected && <Check className="h-3.5 w-3.5 text-neon-400" />}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ))}
                 </div>
-                {models.map((m) => {
-                  const isChat = m.type === "chat";
-                  const isImageGen = m.type === "image_gen";
-                  const isSelected = isChat ? m.value === model : m.value === imageGenModel;
-                  const isDisabled = isImageGen && !configuredImageGenProviders?.includes((m as ImageGenEntry).provider);
-                  const ProviderIcon = getProviderIcon(m.group);
+              )}
 
-                  return (
-                    <button
-                      key={m.value}
-                      type="button"
-                      disabled={isDisabled}
-                      onClick={() => {
-                        if (isDisabled) return;
-                        if (isChat) onModelChange(m.value);
-                        else if (isImageGen && onImageGenModelChange) onImageGenModelChange(m.value);
-                      }}
-                      className={`w-full flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition-all mb-0.5 ${
-                        isDisabled
-                          ? "opacity-40 cursor-not-allowed"
-                          : isSelected
-                            ? "bg-neon-400/8 ring-1 ring-neon-400/20"
-                            : "hover:bg-zinc-900/80"
-                      }`}
-                    >
-                      {/* Provider icon */}
-                      <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
-                        isSelected
-                          ? isImageGen ? "bg-violet-500/15" : "bg-neon-400/10"
-                          : "bg-zinc-900"
-                      }`}>
-                        {isImageGen
-                          ? <ImagePlus className={`h-4 w-4 ${isSelected ? "text-violet-400" : "text-zinc-500"}`} />
-                          : <ProviderIcon className={`h-4 w-4 ${isSelected ? "text-neon-400" : "text-zinc-500"}`} />
-                        }
-                      </div>
+              {/* ── Divider ── */}
+              {sections.brainModels.length > 0 && sections.imageGenModels.length > 0 && (
+                <div className="mx-2 my-2 border-t border-zinc-800/60" />
+              )}
 
-                      {/* Model info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[13px] font-medium leading-tight ${
-                            isDisabled ? "text-zinc-600" : isSelected ? "text-zinc-100" : "text-zinc-300"
-                          }`}>
-                            {m.label}
-                          </span>
-                          {isChat && <TierBadge tier={(m as ModelEntry).tier} />}
-                        </div>
-                        <p className={`text-[11px] mt-0.5 leading-tight ${
-                          isDisabled ? "text-zinc-700" : "text-zinc-500"
+              {/* ── Image Generation section ── */}
+              {sections.imageGenModels.length > 0 && (
+                <div>
+                  <div className="sticky top-0 z-10 bg-zinc-950/95 backdrop-blur px-2 pt-1 pb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <ImagePlus className="h-3 w-3 text-violet-400" />
+                      <span className="text-[9px] font-semibold text-violet-400/80 uppercase tracking-wider">Image Generation</span>
+                    </div>
+                  </div>
+                  {sections.imageGenModels.map((m) => {
+                    const isSelected = m.value === imageGenModel;
+                    const isDisabled = !configuredImageGenProviders?.includes((m as ImageGenEntry).provider);
+                    const ProviderIcon = getProviderIcon(m.group);
+                    return (
+                      <button
+                        key={m.value}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => {
+                          if (!isDisabled && onImageGenModelChange) onImageGenModelChange(m.value);
+                        }}
+                        className={`w-full flex items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition-all mb-0.5 ${
+                          isDisabled
+                            ? "opacity-40 cursor-not-allowed"
+                            : isSelected
+                              ? "bg-violet-500/8 ring-1 ring-violet-500/20"
+                              : "hover:bg-zinc-900/80"
+                        }`}
+                      >
+                        <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
+                          isSelected ? "bg-violet-500/15" : "bg-zinc-900"
                         }`}>
-                          {isDisabled ? "No API key configured" : m.description}
-                        </p>
-                      </div>
+                          <ProviderIcon className={`h-4 w-4 ${isSelected ? "text-violet-400" : "text-zinc-500"}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[13px] font-medium leading-tight ${
+                              isDisabled ? "text-zinc-600" : isSelected ? "text-zinc-100" : "text-zinc-300"
+                            }`}>{m.label}</span>
+                          </div>
+                          <p className={`text-[11px] mt-0.5 leading-tight ${
+                            isDisabled ? "text-zinc-700" : "text-zinc-500"
+                          }`}>
+                            {isDisabled ? "No API key configured" : m.description}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {isDisabled && <Lock className="h-3.5 w-3.5 text-zinc-700" />}
+                          {isSelected && <Check className="h-3.5 w-3.5 text-violet-400" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
-                      {/* Capabilities / status */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        {isChat && (m as ModelEntry).capabilities.includes("vision") && (
-                          <Eye className={`h-3.5 w-3.5 ${isSelected ? "text-blue-400" : "text-zinc-700"}`} title="Vision" />
-                        )}
-                        {isChat && (m as ModelEntry).capabilities.includes("thinking") && (
-                          <Brain className={`h-3.5 w-3.5 ${isSelected ? "text-pink-400" : "text-zinc-700"}`} title="Thinking" />
-                        )}
-                        {isImageGen && !isDisabled && (
-                          <ImagePlus className={`h-3.5 w-3.5 ${isSelected ? "text-violet-400" : "text-zinc-700"}`} />
-                        )}
-                        {isDisabled && (
-                          <Lock className="h-3.5 w-3.5 text-zinc-700" />
-                        )}
-                        {isSelected && (
-                          <Check className="h-3.5 w-3.5 text-neon-400" />
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-
-            {filtered.length === 0 && (
-              <div className="text-center py-6 text-xs text-zinc-600">
-                No models found
-              </div>
-            )}
+              {filtered.length === 0 && (
+                <div className="text-center py-6 text-xs text-zinc-600">
+                  No models found
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

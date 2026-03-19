@@ -23,21 +23,17 @@ export default function ChatPage() {
   const linkedCredentials = useQuery(api.credentials.listForAgent, { agentId: agent._id });
 
   // Determine which image gen providers have credentials available
+  // Image gen models are independent from the agent's chat model
   const configuredImageGenProviders = useMemo(() => {
     const providers: string[] = [];
 
-    // If agent uses a Gemini chat model, the server has GEMINI_API_KEY — Imagen is available
-    if (agent.model?.startsWith("gemini-")) {
-      providers.push("gemini");
-    }
+    // Gemini Imagen is always available via GEMINI_API_KEY env var on the server
+    providers.push("gemini");
 
-    // Also check credential system links
+    // Also check credential system links for additional providers
     if (linkedCredentials) {
       for (const link of linkedCredentials) {
         if (link.toolSetName === "image_generation") {
-          if (link.credentialType === "image_gen_gemini" && !providers.includes("gemini")) {
-            providers.push("gemini");
-          }
           if (link.credentialType === "image_gen_nano_banana" && !providers.includes("nano_banana")) {
             providers.push("nano_banana");
           }
@@ -46,7 +42,7 @@ export default function ChatPage() {
     }
 
     return providers;
-  }, [linkedCredentials, agent.model]);
+  }, [linkedCredentials]);
 
   // Loading state
   if (conversation === undefined || messages === undefined) {

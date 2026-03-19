@@ -162,6 +162,12 @@ export async function runGeminiAgent(params: RunGeminiAgentParams) {
       ? await convexClient.listAgentDocuments(params.agentId)
       : [];
 
+    // Load image generation credentials if enabled
+    let imageGenConfig: any = null;
+    if (geminiEnabled.includes("image_generation")) {
+      imageGenConfig = await convexClient.getCredentialForToolSet(params.agentId, "image_generation");
+    }
+
     const systemPrompt = buildSystemPrompt(
       {
         name: agent.name,
@@ -184,6 +190,8 @@ export async function runGeminiAgent(params: RunGeminiAgentParams) {
       enabledToolSets: agent.enabledToolSets,
       tabs: tabs as any,
       customTools: customTools as any,
+      imageGenConfig,
+      imageGenModel: agent.imageGenModel,
     });
 
     // Initialize Gemini
@@ -369,6 +377,12 @@ export async function runGeminiApiEndpoint(params: {
     ? await convexClient.listAgentDocuments(params.agentId)
     : [];
 
+  // Load image generation credentials if enabled
+  let apiImageGenConfig: any = null;
+  if (apiEnabled.includes("image_generation")) {
+    apiImageGenConfig = await convexClient.getCredentialForToolSet(params.agentId, "image_generation");
+  }
+
   const systemPrompt = buildSystemPrompt(
     {
       name: agent.name,
@@ -391,6 +405,8 @@ export async function runGeminiApiEndpoint(params: {
     enabledToolSets: agent.enabledToolSets,
     tabs: tabs as any,
     customTools: customTools as any,
+    imageGenConfig: apiImageGenConfig,
+    imageGenModel: agent.imageGenModel,
   });
 
   const apiKey = process.env.GEMINI_API_KEY;
