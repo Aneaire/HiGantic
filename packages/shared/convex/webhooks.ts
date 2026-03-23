@@ -31,6 +31,19 @@ export const list = query({
   },
 });
 
+export const listByAgent = query({
+  args: { agentId: v.id("agents") },
+  handler: async (ctx, args) => {
+    const user = await requireAuthUser(ctx);
+    const agent = await ctx.db.get(args.agentId);
+    if (!agent || agent.userId !== user._id) return [];
+    return await ctx.db
+      .query("webhooks")
+      .withIndex("by_agent", (q) => q.eq("agentId", args.agentId))
+      .collect();
+  },
+});
+
 export const create = mutation({
   args: {
     tabId: v.id("sidebarTabs"),

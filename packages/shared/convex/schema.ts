@@ -67,7 +67,8 @@ export default defineSchema({
       v.literal("markdown"),
       v.literal("data_table"),
       v.literal("postgres"),
-      v.literal("api")
+      v.literal("api"),
+      v.literal("workflow")
     ),
     config: v.optional(v.any()),
     sortOrder: v.number(),

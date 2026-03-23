@@ -59,7 +59,8 @@ export const create = mutation({
       v.literal("markdown"),
       v.literal("data_table"),
       v.literal("postgres"),
-      v.literal("api")
+      v.literal("api"),
+      v.literal("workflow")
     ),
     icon: v.optional(v.string()),
     config: v.optional(v.any()),
@@ -74,7 +75,7 @@ export const create = mutation({
     // Plan-gate page types
     const plan = user.plan as "free" | "pro" | "enterprise";
     const allowedFree = ["tasks", "notes", "markdown", "data_table"];
-    const allowedPro = [...allowedFree, "spreadsheet", "postgres", "api"];
+    const allowedPro = [...allowedFree, "spreadsheet", "postgres", "api", "workflow"];
     const allowed = plan === "free" ? allowedFree : allowedPro;
     if (!allowed.includes(args.type)) {
       throw new Error(

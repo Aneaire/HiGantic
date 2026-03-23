@@ -21,6 +21,7 @@ import {
   Trash2,
   Check,
   ImageIcon,
+  GitBranch,
 } from "lucide-react";
 import { useState, useRef, useMemo } from "react";
 import type { Doc } from "@agent-maker/shared/convex/_generated/dataModel";
@@ -32,14 +33,15 @@ const TAB_ICONS: Record<string, React.ReactNode> = {
   markdown: <Type className="h-4 w-4" />,
   postgres: <Database className="h-4 w-4" />,
   api: <Globe className="h-4 w-4" />,
+  workflow: <GitBranch className="h-4 w-4" />,
 };
 
 const PAGE_TYPES = [
   { type: "tasks" as const, label: "Tasks", description: "Kanban board", icon: CheckSquare },
   { type: "notes" as const, label: "Notes", description: "Markdown notes", icon: FileText },
   { type: "spreadsheet" as const, label: "Spreadsheet", description: "Data table", icon: Table },
-  { type: "markdown" as const, label: "Markdown Page", description: "Read-only page", icon: Type },
   { type: "api" as const, label: "REST API", description: "Expose agent as API", icon: Globe },
+  { type: "workflow" as const, label: "Workflow", description: "Automations & schedules", icon: GitBranch },
 ];
 
 function groupConversationsByTime(conversations: Doc<"conversations">[]) {

@@ -1,5 +1,18 @@
 # Agent Maker
 
+## Documentation Rules (Read First)
+
+This file is the primary context source for AI coding agents. Keep it optimized:
+
+- **Be concise** — one line per fact, no prose, no filler words
+- **No explanations of why** — agents need what, not why
+- **Checklists over paragraphs** — numbered steps, not narratives
+- **Update on every feature** — if you add a page type, tool set, or pattern, update the relevant checklist here and in `AGENTS.md` (always kept identical)
+- **No duplication** — if it's in `docs/`, link to it; don't repeat it here
+- **Inline examples only when the pattern is non-obvious** — skip obvious ones
+
+> When you modify `CLAUDE.md`, you **must** apply the identical change to `AGENTS.md`.
+
 ## Project Structure
 
 Monorepo with 3 packages:
@@ -48,6 +61,57 @@ When adding a new feature or tool set, **all 6 steps are required** or the agent
 2. Add the tool name to `buildAllowedTools()` in `mcp-server.ts`
 3. Update system prompt guidance if the tool introduces new behavior the agent should know about
 4. Add any new Convex endpoints needed
+
+## Adding a New Workspace Page Type (Checklist)
+
+Workspace pages are tabs in the agent sidebar (tasks, notes, spreadsheet, api, workflow, etc.).
+When adding a new page type, **all 7 steps are required**:
+
+1. **`packages/shared/src/types/index.ts`** — Add the string to the `TabType` union AND to `PLAN_LIMITS.allowedPageTypes` for the appropriate plan tiers (free / pro / enterprise)
+2. **`packages/shared/convex/schema.ts`** — Add `v.literal("your-type")` to the `sidebarTabs.type` union validator
+3. **`packages/shared/convex/sidebarTabs.ts`** — Add `v.literal("your-type")` to the `create` mutation's type arg validator AND add the string to the `allowedPro` array in the plan-gate logic
+4. **Page component** — Create `packages/web/app/components/pages/YourPage.tsx`. See UI Conventions below. The component receives `{ tab: Doc<"sidebarTabs"> }` — use `tab.agentId` for all agent-scoped Convex queries.
+5. **Route handler** — Add `case "your-type": return <YourPage tab={tab} />;` in `packages/web/app/routes/agents.$agentId.tab.$tabId.tsx`
+6. **`packages/web/app/components/AgentSidebar.tsx`** — Add icon to `TAB_ICONS` record + new entry to `PAGE_TYPES` array with `{ type, label, description, icon }`
+7. **Backend queries** — Add any new Convex queries/mutations the page needs. If querying by agent (not tab), add a `listByAgent` or similar query using the `by_agent` index. If the page stores its own data, add a new table to `schema.ts` and a corresponding `remove` cascade in `sidebarTabs.ts → remove()`
+
+> **Note**: Page types gated to `pro`/`enterprise` only need to be added to `allowedPro` (step 3). Free-tier types must also be added to `allowedFree`.
+
+## UI Conventions (Web)
+
+All page components follow these patterns — match them exactly for visual consistency:
+
+**Layout shell:**
+```tsx
+<div className="flex-1 flex flex-col min-h-0">
+  {/* Header */}
+  <div className="border-b border-zinc-800/60 px-6 py-4 flex items-center justify-between shrink-0">
+    ...
+  </div>
+  {/* Scrollable body */}
+  <div className="flex-1 overflow-y-auto p-6">
+    <div className="max-w-2xl mx-auto space-y-6">
+      ...
+    </div>
+  </div>
+</div>
+```
+
+**Section cards:** `rounded-2xl border border-zinc-800/60 bg-zinc-900/50 overflow-hidden`
+
+**Form inputs:** `rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm focus:border-zinc-500 focus:outline-none transition-colors`
+
+**Primary button:** `text-xs bg-zinc-100 text-zinc-900 px-4 py-2 rounded-lg font-semibold hover:bg-white disabled:opacity-30 transition-all`
+
+**Ghost button:** `text-xs text-zinc-500 px-3 py-2 hover:text-zinc-300 rounded-lg hover:bg-zinc-800 transition-colors`
+
+**Danger button:** `p-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-red-950/30 transition-all`
+
+**Active/enabled toggle:** `text-neon-400 hover:bg-neon-950/30`
+
+**Loading skeleton:** `animate-pulse bg-zinc-800/20 rounded-xl`
+
+**Tech stack:** Tailwind 4, Lucide React icons, Convex `useQuery`/`useMutation`, React 19, React Router 7. No shadcn/ui. Dark theme only (zinc-900/950 base, neon-400 accent).
 
 ## System Prompt: Available Integrations
 

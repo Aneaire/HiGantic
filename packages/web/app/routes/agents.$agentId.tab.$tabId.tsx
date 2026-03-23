@@ -5,9 +5,10 @@ import { Loader2 } from "lucide-react";
 import { TasksPage } from "~/components/pages/TasksPage";
 import { NotesPage } from "~/components/pages/NotesPage";
 import { SpreadsheetPage } from "~/components/pages/SpreadsheetPage";
-import { MarkdownPage } from "~/components/pages/MarkdownPage";
+
 import { PostgresPage } from "~/components/pages/PostgresPage";
 import { ApiPage } from "~/components/pages/ApiPage";
+import { WorkflowPage } from "~/components/pages/WorkflowPage";
 import type { Doc } from "@agent-maker/shared/convex/_generated/dataModel";
 import type { Id } from "@agent-maker/shared/convex/_generated/dataModel";
 
@@ -51,11 +52,13 @@ export default function DynamicTabPage() {
     case "spreadsheet":
       return <SpreadsheetPage tab={tab} />;
     case "markdown":
-      return <MarkdownPage tab={tab} />;
+      return <NotesPage tab={tab} />;
     case "postgres":
       return <PostgresPage tab={tab} />;
     case "api":
       return <ApiPage tab={tab} />;
+    case "workflow":
+      return <WorkflowPage tab={tab} />;
     default:
       return (
         <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm">
