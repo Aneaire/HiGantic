@@ -54,7 +54,7 @@ import type { Route } from "./+types/home";
 
 export function meta(_args: Route.MetaArgs) {
   return [
-    { title: "Agent Maker — Build AI Agents That Work For You" },
+    { title: "HiGantic — Build AI Agents That Work For You" },
     {
       name: "description",
       content:
@@ -168,11 +168,11 @@ function LandingNav() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neon-400/10 ring-1 ring-neon-400/20 overflow-hidden">
             <img
               src="/logo.png"
-              alt="Agent Maker"
+              alt="HiGantic"
               className="h-6 w-6 object-contain"
             />
           </div>
-          Agent Maker
+          HiGantic
         </Link>
 
         <div className="hidden md:flex items-center gap-8">
@@ -998,7 +998,7 @@ function PricingSection() {
       name: "Free",
       price: "$0",
       period: "forever",
-      desc: "Perfect for trying out Agent Maker",
+      desc: "Perfect for trying out HiGantic",
       features: [
         "Up to 3 agents",
         "Tasks, Notes & Markdown pages",
@@ -1168,7 +1168,7 @@ function FinalCTASection() {
         >
           <img
             src="/logo.png"
-            alt="Agent Maker"
+            alt="HiGantic"
             className="h-14 w-14 object-contain"
           />
         </div>
@@ -1228,11 +1228,11 @@ function Footer() {
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-neon-400/10 ring-1 ring-neon-400/20 overflow-hidden">
                 <img
                   src="/logo.png"
-                  alt="Agent Maker"
+                  alt="HiGantic"
                   className="h-5 w-5 object-contain"
                 />
               </div>
-              Agent Maker
+              HiGantic
             </Link>
             <p className="mt-3 text-sm text-zinc-600 leading-relaxed">
               Build AI agents that think, remember, and act autonomously.
@@ -1302,7 +1302,7 @@ function Footer() {
         {/* Bottom bar */}
         <div className="mt-12 pt-6 border-t border-zinc-800/40 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-zinc-700">
-            &copy; {new Date().getFullYear()} Agent Maker. All rights reserved.
+            &copy; {new Date().getFullYear()} HiGantic. All rights reserved.
           </p>
           <div className="flex items-center gap-1 text-xs text-zinc-700">
             Built with

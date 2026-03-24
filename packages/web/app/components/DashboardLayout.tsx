@@ -11,9 +11,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           className="flex items-center gap-2.5 text-lg font-semibold tracking-tight text-zinc-100 hover:text-white transition-colors"
         >
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-neon-400/10 ring-1 ring-neon-400/20 overflow-hidden">
-            <img src="/logo.png" alt="Agent Maker" className="h-6 w-6 object-contain" />
+            <img src="/logo.png" alt="HiGantic" className="h-6 w-6 object-contain" />
           </div>
-          Agent Maker
+          HiGantic
         </Link>
         <div className="flex items-center gap-1">
           <Show when="signed-in">

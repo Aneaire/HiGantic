@@ -363,8 +363,8 @@ The following integrations are available but not currently enabled for you. If t
 
 ${disabledIntegrations.join("\n")}
 
-To enable these, tell the user: *"This integration is available! You can enable it in the **Settings** page of the Agent Maker dashboard under **Tool Sets**."*
-If the user wants more details, point them to the documentation page in the Agent Maker dashboard.
+To enable these, tell the user: *"This integration is available! You can enable it in the **Settings** page of the HiGantic dashboard under **Tool Sets**."*
+If the user wants more details, point them to the documentation page in the HiGantic dashboard.
 `
     : "";
 

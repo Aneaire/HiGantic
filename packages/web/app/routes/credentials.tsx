@@ -138,7 +138,7 @@ function CredentialTypeSelector({
 }
 
 export function meta(_args: Route.MetaArgs) {
-  return [{ title: "Credentials — Agent Maker" }];
+  return [{ title: "Credentials — HiGantic" }];
 }
 
 export default function CredentialsPage() {

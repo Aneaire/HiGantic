@@ -365,6 +365,21 @@
   }
 }
 
+/* ── Clerk modal centering ─────────────────────────────────────────── */
+
+.cl-modalBackdrop {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.cl-modal {
+  margin: 0 !important;
+  position: relative !important;
+  top: auto !important;
+  transform: none !important;
+}
+
 /* ── Scrollbar styling ──────────────────────────────────────────────── */
 
 @layer base {

@@ -245,6 +245,11 @@ const clerkAppearance = {
       backgroundColor: "rgba(0, 0, 0, 0.7)",
       backdropFilter: "blur(8px)",
     },
+    modalContent: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+    },
 
     // ── Select / dropdown ───────────────────────────────
     selectButton: {
