@@ -64,6 +64,15 @@ When adding a new feature or tool set, **all 7 steps are required** or the agent
 
 > **Critical**: Step 3 is the most commonly missed. Without system prompt updates, the agent has the tool but doesn't know to use it effectively. The `allIntegrations` map is also important — it lets the agent tell users about available integrations they haven't enabled yet.
 
+## Adding a New AI Model (Checklist)
+
+When adding support for a new AI model, **all 4 steps are required**:
+
+1. **Agent runtime** — Add model routing in `packages/agent/src/` (model ID, API client, response mapping)
+2. **UI model selector** — Add option to model picker in agent settings and creator flow
+3. **Landing page badge** — Add entry to `SUPPORTED_MODELS` array in `packages/web/app/routes/home.tsx` (drives the animated "Powered by" hero badge). Include `name` and a Tailwind `color` class
+4. **CSS animation** — If the total model count changes, update the `slide-models` keyframe percentages in `packages/web/app/styles.css` to evenly distribute across the new count (formula: each step = `100% / modelCount`, with ~7% hold time per step)
+
 ## Adding a New Tool to an Existing Tool Set
 
 1. Add the tool function in the existing `*-tools.ts` file

@@ -142,6 +142,42 @@ function useInView(threshold = 0.15) {
   return { ref, inView };
 }
 
+/* ── Model Slide Badge ──────────────────────────────────────────────── */
+/*
+ * SUPPORTED_MODELS: When adding a new AI model to the platform, add it here.
+ * This list drives the animated "Powered by" badge on the landing page hero.
+ * See CLAUDE.md / AGENTS.md for the full checklist when adding a model.
+ */
+const SUPPORTED_MODELS = [
+  { name: "Claude", color: "text-neon-400" },
+  { name: "Gemini", color: "text-blue-400" },
+];
+
+function ModelSlideBadge() {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-full border border-neon-400/20 bg-neon-400/5 px-4 py-1.5 mb-8 fade-in-up-slow">
+      <div className="h-1.5 w-1.5 rounded-full bg-neon-400 status-pulse" />
+      <span className="text-xs font-medium text-zinc-500">Powered by</span>
+      <div className="h-[20px] overflow-hidden">
+        <div className="model-slider-track">
+          {SUPPORTED_MODELS.map((model) => (
+            <div
+              key={model.name}
+              className="h-[20px] flex items-center"
+            >
+              <span
+                className={`text-xs font-semibold whitespace-nowrap ${model.color}`}
+              >
+                {model.name}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Landing Nav ────────────────────────────────────────────────────── */
 function LandingNav() {
   const [scrolled, setScrolled] = useState(false);
@@ -250,13 +286,8 @@ function HeroSection() {
       </div>
 
       <div className="relative max-w-7xl mx-auto px-6 text-center">
-        {/* Badge */}
-        <div className="inline-flex items-center gap-2 rounded-full border border-neon-400/20 bg-neon-400/5 px-4 py-1.5 mb-8 fade-in-up-slow">
-          <div className="h-1.5 w-1.5 rounded-full bg-neon-400 status-pulse" />
-          <span className="text-xs font-medium text-neon-400/80">
-            Powered by Claude AI
-          </span>
-        </div>
+        {/* Badge — sliding model showcase */}
+        <ModelSlideBadge />
 
         {/* Headline */}
         <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-[1.05] fade-in-up-slow" style={{ animationDelay: "0.1s" }}>
@@ -295,7 +326,7 @@ function HeroSection() {
 
         {/* Hero visual — Mock agent workspace */}
         <div className="relative mt-20 max-w-5xl mx-auto fade-in-up-slow" style={{ animationDelay: "0.45s" }}>
-          <div className="relative rounded-2xl border border-zinc-800/60 bg-zinc-900/40 backdrop-blur-xl overflow-hidden shadow-2xl shadow-black/40">
+          <div className="relative rounded-2xl border border-zinc-800/60 bg-zinc-900/40 backdrop-blur-xl overflow-hidden shadow-2xl shadow-black/40 text-left">
             {/* Window chrome */}
             <div className="flex items-center gap-2 px-4 py-3 border-b border-zinc-800/60 bg-zinc-900/60">
               <div className="flex gap-1.5">

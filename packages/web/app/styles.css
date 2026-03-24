@@ -365,6 +365,19 @@
   }
 }
 
+/* ── Model slideshow (vertical slide) ──────────────────────────────── */
+/* 2 models, each 20px tall. Slide by 20px per step. */
+
+@keyframes slide-models {
+  0%, 40%   { transform: translateY(0); }
+  50%, 90%  { transform: translateY(-20px); }
+  100%      { transform: translateY(0); }
+}
+
+.model-slider-track {
+  animation: slide-models 6s ease-in-out infinite;
+}
+
 /* ── Clerk modal centering ─────────────────────────────────────────── */
 
 .cl-modalBackdrop {
