@@ -63,8 +63,8 @@ function LandingView() {
 
       {/* Hero icon */}
       <div className="relative mb-8 fade-in-up">
-        <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-neon-400/10 ring-1 ring-neon-400/20 shadow-2xl shadow-neon-400/10">
-          <Bot className="h-10 w-10 text-neon-400" />
+        <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-neon-400/10 ring-1 ring-neon-400/20 shadow-2xl shadow-neon-400/10 overflow-hidden">
+          <img src="/logo.png" alt="Agent Maker" className="h-14 w-14 object-contain" />
         </div>
         <div className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-neon-400 ring-4 ring-zinc-950">
           <Sparkles className="h-3 w-3 text-zinc-950" />
