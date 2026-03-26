@@ -177,9 +177,19 @@ function LandingNav() {
 /* ── Hero ────────────────────────────────────────────────────────────── */
 function Hero() {
   return (
-    <section className="relative pt-28 pb-0 md:pt-36">
-      {/* Single subtle glow — not blobs everywhere */}
+    <section className="relative pt-28 pb-0 md:pt-36 overflow-hidden">
+      {/* ── Background layers ── */}
+      {/* Dot grid pattern */}
+      <div className="absolute inset-0 hero-dot-grid opacity-[0.035] pointer-events-none" />
+      {/* Primary neon glow */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-neon-400/[0.04] blur-[180px] rounded-full pointer-events-none" />
+      {/* Secondary blue glow — adds depth on the right */}
+      <div className="absolute top-20 right-0 w-[500px] h-[400px] bg-blue-500/[0.025] blur-[150px] rounded-full pointer-events-none" />
+
+      {/* ── Floating constellation — right side decoration ── */}
+      <div className="absolute top-16 right-0 w-[500px] h-[500px] pointer-events-none hidden lg:block fade-in-up-slow" style={{ animationDelay: "0.5s" }}>
+        <HeroConstellation />
+      </div>
 
       <div className="relative max-w-6xl mx-auto px-6">
         {/* Tight editorial layout — left aligned, not centered */}
@@ -232,6 +242,110 @@ function Hero() {
         </div>
       </div>
     </section>
+  );
+}
+
+/* ── Hero Constellation — animated SVG neural network on right side ── */
+function HeroConstellation() {
+  // Node positions (x, y) within the 500x500 viewbox
+  const nodes = [
+    { x: 120, y: 80, r: 3, delay: 0 },
+    { x: 280, y: 50, r: 4, delay: 0.3 },
+    { x: 400, y: 110, r: 3, delay: 0.6 },
+    { x: 180, y: 180, r: 5, delay: 0.2 },
+    { x: 330, y: 200, r: 3.5, delay: 0.5 },
+    { x: 450, y: 180, r: 3, delay: 0.8 },
+    { x: 100, y: 300, r: 3, delay: 0.4 },
+    { x: 250, y: 320, r: 6, delay: 0.1 }, // central node — bigger
+    { x: 380, y: 290, r: 4, delay: 0.7 },
+    { x: 150, y: 420, r: 3.5, delay: 0.3 },
+    { x: 310, y: 430, r: 3, delay: 0.6 },
+    { x: 440, y: 380, r: 3.5, delay: 0.9 },
+  ];
+
+  // Edges between nearby nodes
+  const edges = [
+    [0, 1], [1, 2], [0, 3], [1, 4], [2, 5],
+    [3, 4], [4, 5], [3, 6], [3, 7], [4, 7],
+    [4, 8], [5, 8], [6, 7], [7, 8], [6, 9],
+    [7, 10], [8, 11], [9, 10], [10, 11], [7, 9],
+  ];
+
+  return (
+    <svg viewBox="0 0 500 500" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        {/* Glow filter for nodes */}
+        <filter id="nodeGlow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="6" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        {/* Gradient for the central node */}
+        <radialGradient id="centralGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#34d399" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="#34d399" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      {/* Edges */}
+      {edges.map(([a, b], i) => (
+        <line
+          key={`e-${i}`}
+          x1={nodes[a].x} y1={nodes[a].y}
+          x2={nodes[b].x} y2={nodes[b].y}
+          stroke="#34d399"
+          strokeOpacity="0.08"
+          strokeWidth="1"
+          className="constellation-edge"
+          style={{ animationDelay: `${i * 0.15}s` }}
+        />
+      ))}
+
+      {/* Data pulse along edges */}
+      {[0, 3, 6, 10, 14, 18].map((edgeIdx) => {
+        const [a, b] = edges[edgeIdx];
+        return (
+          <circle
+            key={`pulse-${edgeIdx}`}
+            r="2"
+            fill="#34d399"
+            opacity="0.5"
+          >
+            <animateMotion
+              dur={`${3 + edgeIdx * 0.5}s`}
+              repeatCount="indefinite"
+              path={`M${nodes[a].x},${nodes[a].y} L${nodes[b].x},${nodes[b].y}`}
+            />
+            <animate
+              attributeName="opacity"
+              values="0;0.6;0"
+              dur={`${3 + edgeIdx * 0.5}s`}
+              repeatCount="indefinite"
+            />
+          </circle>
+        );
+      })}
+
+      {/* Central glow */}
+      <circle cx={250} cy={320} r="40" fill="url(#centralGlow)" className="constellation-pulse" />
+
+      {/* Nodes */}
+      {nodes.map((node, i) => (
+        <g key={`n-${i}`} filter="url(#nodeGlow)">
+          <circle
+            cx={node.x}
+            cy={node.y}
+            r={node.r}
+            fill="#34d399"
+            opacity={i === 7 ? 0.8 : 0.4}
+            className="constellation-node"
+            style={{ animationDelay: `${node.delay}s` }}
+          />
+        </g>
+      ))}
+    </svg>
   );
 }
 
@@ -824,8 +938,18 @@ function BottomCTA() {
   const { ref, inView } = useInView();
 
   return (
-    <section ref={ref} className="border-t border-zinc-800/30">
-      <div className="max-w-6xl mx-auto px-6 py-24 md:py-32">
+    <section ref={ref} className="relative border-t border-zinc-800/30 overflow-hidden">
+      {/* ── Background assets ── */}
+      {/* Radial gradient spotlight */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-neon-400/[0.03] blur-[200px] rounded-full pointer-events-none" />
+      {/* Dot grid */}
+      <div className="absolute inset-0 hero-dot-grid opacity-[0.025] pointer-events-none" />
+      {/* Floating rings — right side decoration */}
+      <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none hidden md:block opacity-60">
+        <CTARings />
+      </div>
+
+      <div className="relative max-w-6xl mx-auto px-6 py-24 md:py-32">
         <div
           className={`max-w-2xl transition-all duration-700 ${
             inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
@@ -848,6 +972,48 @@ function BottomCTA() {
         </div>
       </div>
     </section>
+  );
+}
+
+/* ── CTA Rings — concentric orbiting rings with nodes ─────────────── */
+function CTARings() {
+  return (
+    <svg width="400" height="400" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="ctaCenterGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#34d399" stopOpacity="0.15" />
+          <stop offset="70%" stopColor="#34d399" stopOpacity="0.02" />
+          <stop offset="100%" stopColor="#34d399" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+
+      {/* Center glow */}
+      <circle cx="200" cy="200" r="120" fill="url(#ctaCenterGlow)" />
+
+      {/* Ring 1 — inner */}
+      <circle cx="200" cy="200" r="60" fill="none" stroke="#34d399" strokeOpacity="0.08" strokeWidth="0.75" />
+      {/* Ring 2 — mid */}
+      <circle cx="200" cy="200" r="110" fill="none" stroke="#34d399" strokeOpacity="0.06" strokeWidth="0.75" strokeDasharray="4 8" className="cta-ring-spin" />
+      {/* Ring 3 — outer */}
+      <circle cx="200" cy="200" r="160" fill="none" stroke="#34d399" strokeOpacity="0.04" strokeWidth="0.75" strokeDasharray="2 12" className="cta-ring-spin-reverse" />
+
+      {/* Orbiting node on ring 1 */}
+      <circle r="3" fill="#34d399" opacity="0.6" className="cta-orbit-1">
+        <animateMotion dur="12s" repeatCount="indefinite" path="M200,140 A60,60 0 1,1 199.99,140" />
+      </circle>
+      {/* Orbiting node on ring 2 */}
+      <circle r="2.5" fill="#60a5fa" opacity="0.5" className="cta-orbit-2">
+        <animateMotion dur="20s" repeatCount="indefinite" path="M200,90 A110,110 0 1,1 199.99,90" />
+      </circle>
+      {/* Orbiting node on ring 3 */}
+      <circle r="2" fill="#34d399" opacity="0.3">
+        <animateMotion dur="30s" repeatCount="indefinite" path="M200,40 A160,160 0 1,1 199.99,40" />
+      </circle>
+
+      {/* Center dot */}
+      <circle cx="200" cy="200" r="4" fill="#34d399" opacity="0.5" className="constellation-pulse" />
+      <circle cx="200" cy="200" r="2" fill="#34d399" opacity="0.9" />
+    </svg>
   );
 }
 

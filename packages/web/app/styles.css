@@ -389,6 +389,63 @@
   animation: marquee-scroll 30s linear infinite;
 }
 
+/* ── Hero dot grid background ─────────────────────────────────────── */
+
+.hero-dot-grid {
+  background-image: radial-gradient(circle, rgba(161, 161, 170, 0.5) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ── SVG constellation animations ─────────────────────────────────── */
+
+@keyframes constellation-fade {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}
+
+.constellation-node {
+  animation: constellation-fade 4s ease-in-out infinite;
+}
+
+@keyframes constellation-edge-draw {
+  from { stroke-dashoffset: 100; }
+  to { stroke-dashoffset: 0; }
+}
+
+.constellation-edge {
+  stroke-dasharray: 100;
+  animation: constellation-edge-draw 2s ease-out forwards;
+}
+
+@keyframes constellation-pulse-anim {
+  0%, 100% { r: 40; opacity: 0.15; }
+  50% { r: 50; opacity: 0.25; }
+}
+
+.constellation-pulse {
+  animation: constellation-pulse-anim 4s ease-in-out infinite;
+}
+
+/* ── CTA ring animations ──────────────────────────────────────────── */
+
+@keyframes cta-ring-spin {
+  from { transform-origin: 200px 200px; transform: rotate(0deg); }
+  to { transform-origin: 200px 200px; transform: rotate(360deg); }
+}
+
+@keyframes cta-ring-spin-reverse {
+  from { transform-origin: 200px 200px; transform: rotate(360deg); }
+  to { transform-origin: 200px 200px; transform: rotate(0deg); }
+}
+
+.cta-ring-spin {
+  animation: cta-ring-spin 40s linear infinite;
+}
+
+.cta-ring-spin-reverse {
+  animation: cta-ring-spin-reverse 60s linear infinite;
+}
+
 /* ── Clerk modal centering ─────────────────────────────────────────── */
 
 .cl-modalBackdrop {
