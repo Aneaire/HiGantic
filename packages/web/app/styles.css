@@ -438,6 +438,44 @@
   to { transform-origin: 200px 200px; transform: rotate(0deg); }
 }
 
+/* ── Scroll indicator animation ───────────────────────────────────── */
+
+@keyframes scroll-bounce {
+  0%, 100% { transform: translateY(0); opacity: 0.6; }
+  50% { transform: translateY(6px); opacity: 1; }
+}
+
+.scroll-indicator {
+  animation: scroll-bounce 2s ease-in-out infinite;
+}
+
+/* ── Integration network animations ──────────────────────────────── */
+
+@keyframes network-float {
+  0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+  50% { transform: translate(-50%, -50%) translateY(-8px); }
+}
+
+.network-bubble {
+  animation: network-float 5s ease-in-out infinite;
+}
+
+@keyframes network-line-draw {
+  from { stroke-dashoffset: 28; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes network-line-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.network-line {
+  animation:
+    network-line-draw 1.5s ease-out both,
+    network-line-pulse 4s ease-in-out infinite 1.5s;
+}
+
 .cta-ring-spin {
   animation: cta-ring-spin 40s linear infinite;
 }

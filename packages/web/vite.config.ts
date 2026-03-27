@@ -5,6 +5,9 @@ import { resolve } from "node:path";
 
 export default defineConfig({
   envDir: resolve(import.meta.dirname, "../.."),
+  server: {
+    port: 5183,
+  },
   plugins: [tailwindcss(), reactRouter()],
   resolve: {
     alias: {

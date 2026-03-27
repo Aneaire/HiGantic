@@ -33,9 +33,13 @@ import {
   Star,
   ArrowUpRight,
   Minus,
+  Layers,
+  Eye,
+  Rocket,
+  Command,
 } from "lucide-react";
 import { Link } from "react-router";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import {
   DndContext,
   closestCenter,
@@ -49,6 +53,9 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import type { Route } from "./+types/home";
+
+const HeroScene = lazy(() => import("~/components/three/HeroScene"));
+const IntegrationNetwork = lazy(() => import("~/components/IntegrationNetwork"));
 
 export function meta(_args: Route.MetaArgs) {
   return [
@@ -77,7 +84,7 @@ export default function HomePage() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   LANDING PAGE
+   LANDING PAGE — Complete refactor with immersive Three.js
    ═══════════════════════════════════════════════════════════════════════ */
 
 function LandingPage() {
@@ -85,7 +92,7 @@ function LandingPage() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100 overflow-x-hidden">
       <LandingNav />
       <Hero />
-      <Marquee />
+      <TrustBar />
       <WhatItDoes />
       <ShowDontTell />
       <ToolTape />
@@ -145,59 +152,73 @@ function LandingNav() {
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         scrolled
-          ? "bg-zinc-950/90 backdrop-blur-2xl border-b border-zinc-800/40"
+          ? "bg-zinc-950/80 backdrop-blur-2xl border-b border-zinc-800/40 shadow-lg shadow-black/20"
           : "bg-transparent"
       }`}
     >
-      <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-          <div className="h-7 w-7 rounded-md bg-neon-400/10 ring-1 ring-neon-400/20 overflow-hidden flex items-center justify-center">
+      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-2.5 text-sm font-semibold tracking-tight">
+          <div className="h-8 w-8 rounded-lg bg-neon-400/10 ring-1 ring-neon-400/25 overflow-hidden flex items-center justify-center">
             <img src="/logo.png" alt="HiGantic" className="h-5 w-5 object-contain" />
           </div>
-          <span>HiGantic</span>
+          <span className="text-zinc-100">HiGantic</span>
         </Link>
 
-        <div className="hidden md:flex items-center gap-6 text-[13px] text-zinc-500">
-          <a href="#what" className="hover:text-zinc-200 transition-colors">Product</a>
-          <a href="#how" className="hover:text-zinc-200 transition-colors">How it works</a>
-          <a href="#pricing" className="hover:text-zinc-200 transition-colors">Pricing</a>
-          <Link to="/docs" className="hover:text-zinc-200 transition-colors">Docs</Link>
+        <div className="hidden md:flex items-center gap-8 text-[13px] text-zinc-500">
+          <a href="#what" className="hover:text-zinc-200 transition-colors nav-underline">Product</a>
+          <a href="#how" className="hover:text-zinc-200 transition-colors nav-underline">How it works</a>
+          <a href="#tools" className="hover:text-zinc-200 transition-colors nav-underline">Tools</a>
+          <a href="#pricing" className="hover:text-zinc-200 transition-colors nav-underline">Pricing</a>
+          <Link to="/docs" className="hover:text-zinc-200 transition-colors nav-underline">Docs</Link>
         </div>
 
-        <SignInButton mode="modal">
-          <button className="text-[13px] font-medium bg-zinc-100 text-zinc-900 px-4 py-1.5 rounded-lg hover:bg-white transition-colors">
-            Sign in
-          </button>
-        </SignInButton>
+        <div className="flex items-center gap-3">
+          <SignInButton mode="modal">
+            <button className="text-[13px] font-medium bg-zinc-100 text-zinc-900 px-5 py-2 rounded-lg hover:bg-white transition-all hover:shadow-lg hover:shadow-white/10">
+              Sign in
+            </button>
+          </SignInButton>
+        </div>
       </div>
     </nav>
   );
 }
 
-/* ── Hero ────────────────────────────────────────────────────────────── */
+/* ── Hero — Immersive Three.js background ───────────────────────────── */
 function Hero() {
   return (
-    <section className="relative pt-28 pb-0 md:pt-36 overflow-hidden">
-      {/* ── Background layers ── */}
-      {/* Dot grid pattern */}
-      <div className="absolute inset-0 hero-dot-grid opacity-[0.035] pointer-events-none" />
-      {/* Primary neon glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-neon-400/[0.04] blur-[180px] rounded-full pointer-events-none" />
-      {/* Secondary blue glow — adds depth on the right */}
-      <div className="absolute top-20 right-0 w-[500px] h-[400px] bg-blue-500/[0.025] blur-[150px] rounded-full pointer-events-none" />
-
-      {/* ── Floating constellation — right side decoration ── */}
-      <div className="absolute top-16 right-0 w-[500px] h-[500px] pointer-events-none hidden lg:block fade-in-up-slow" style={{ animationDelay: "0.5s" }}>
-        <HeroConstellation />
+    <section className="relative min-h-[100vh] flex items-center overflow-hidden">
+      {/* ── Three.js Scene — full bleed background ── */}
+      <div className="absolute inset-0 z-0">
+        <Suspense fallback={
+          <div className="absolute inset-0 bg-zinc-950">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-neon-400/[0.04] blur-[180px] rounded-full" />
+            <div className="absolute top-20 right-0 w-[500px] h-[400px] bg-blue-500/[0.025] blur-[150px] rounded-full" />
+          </div>
+        }>
+          <HeroScene />
+        </Suspense>
       </div>
 
-      <div className="relative max-w-6xl mx-auto px-6">
-        {/* Tight editorial layout — left aligned, not centered */}
-        <div className="max-w-3xl">
+      {/* ── Integration network overlay — logo bubbles + connections ── */}
+      <div className="absolute inset-0 z-[1] hidden lg:block">
+        <Suspense fallback={null}>
+          <IntegrationNetwork />
+        </Suspense>
+      </div>
+
+      {/* ── Gradient overlays for text readability ── */}
+      <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/95 via-zinc-950/60 to-zinc-950/20 z-[2] pointer-events-none" />
+      <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-zinc-950 to-transparent z-[2] pointer-events-none" />
+      <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-b from-zinc-950/80 to-transparent z-[2] pointer-events-none" />
+
+      {/* ── Content ── */}
+      <div className="relative z-[3] max-w-7xl mx-auto px-6 pt-24 pb-20 w-full">
+        <div className="max-w-2xl">
           {/* Model badge */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-zinc-800/80 bg-zinc-900/60 px-3 py-1 mb-6 fade-in-up-slow">
+          <div className="inline-flex items-center gap-2 rounded-full border border-zinc-700/50 bg-zinc-900/70 backdrop-blur-xl px-4 py-1.5 mb-8 fade-in-up-slow">
             <div className="h-1.5 w-1.5 rounded-full bg-neon-400 status-pulse" />
-            <span className="text-[11px] text-zinc-500">Powered by</span>
+            <span className="text-[11px] text-zinc-400">Powered by</span>
             <div className="h-[16px] overflow-hidden">
               <div className="model-slider-track">
                 {SUPPORTED_MODELS.map((m) => (
@@ -209,261 +230,79 @@ function Hero() {
             </div>
           </div>
 
-          <h1 className="text-[clamp(2.5rem,6vw,4.5rem)] font-bold leading-[1.08] tracking-tight fade-in-up-slow" style={{ animationDelay: "0.08s" }}>
+          <h1
+            className="text-[clamp(2.8rem,7vw,5rem)] font-bold leading-[1.05] tracking-tight fade-in-up-slow"
+            style={{ animationDelay: "0.1s" }}
+          >
             Your ideas deserve
             <br />
-            <span className="text-neon-400">agents that ship.</span>
+            <span className="bg-gradient-to-r from-neon-400 via-neon-300 to-emerald-300 bg-clip-text text-transparent">
+              agents that ship.
+            </span>
           </h1>
 
-          <p className="mt-5 text-base md:text-lg text-zinc-400 leading-relaxed max-w-xl fade-in-up-slow" style={{ animationDelay: "0.16s" }}>
-            HiGantic lets you build AI agents that remember context, use tools,
+          <p
+            className="mt-6 text-lg md:text-xl text-zinc-400 leading-relaxed max-w-xl fade-in-up-slow"
+            style={{ animationDelay: "0.2s" }}
+          >
+            Build AI agents that remember context, use 50+ tools,
             browse the web, manage tasks, and run automations — all through conversation.
           </p>
 
-          <div className="flex items-center gap-3 mt-8 fade-in-up-slow" style={{ animationDelay: "0.24s" }}>
+          <div
+            className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mt-10 fade-in-up-slow"
+            style={{ animationDelay: "0.3s" }}
+          >
             <SignInButton mode="modal">
-              <button className="group text-sm font-medium bg-neon-400 text-zinc-950 px-5 py-2.5 rounded-lg hover:bg-neon-300 transition-all glow-neon-sm">
-                Start building
-                <ArrowRight className="inline ml-1.5 h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+              <button className="group relative text-sm font-semibold bg-neon-400 text-zinc-950 px-7 py-3.5 rounded-xl hover:bg-neon-300 transition-all glow-neon overflow-hidden">
+                <span className="relative z-10 flex items-center gap-2">
+                  Start building free
+                  <ArrowRight className="h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+                </span>
               </button>
             </SignInButton>
             <Link
               to="/docs"
-              className="text-sm text-zinc-500 hover:text-zinc-200 transition-colors px-4 py-2.5"
+              className="group flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-100 transition-colors px-2 py-3.5"
             >
+              <Terminal className="h-4 w-4" />
               Read the docs
+              <ArrowUpRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
             </Link>
           </div>
-        </div>
 
-        {/* Hero product shot — the real thing, not a cartoon */}
-        <div className="mt-16 md:mt-20 fade-in-up-slow" style={{ animationDelay: "0.35s" }}>
-          <HeroMockup />
+          {/* Quick stats */}
+          <div
+            className="flex items-center gap-8 mt-14 fade-in-up-slow"
+            style={{ animationDelay: "0.4s" }}
+          >
+            {[
+              { value: "50+", label: "Built-in tools" },
+              { value: "< 2min", label: "To deploy" },
+              { value: "24/7", label: "Autonomous" },
+            ].map((stat) => (
+              <div key={stat.label} className="text-left">
+                <div className="text-xl font-bold text-zinc-100">{stat.value}</div>
+                <div className="text-[11px] text-zinc-600 mt-0.5">{stat.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Scroll indicator ── */}
+      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[3] fade-in-up-slow" style={{ animationDelay: "0.6s" }}>
+        <div className="flex flex-col items-center gap-2">
+          <span className="text-[10px] text-zinc-600 uppercase tracking-[0.15em]">Scroll</span>
+          <div className="w-px h-8 bg-gradient-to-b from-zinc-600 to-transparent scroll-indicator" />
         </div>
       </div>
     </section>
   );
 }
 
-/* ── Hero Constellation — animated SVG neural network on right side ── */
-function HeroConstellation() {
-  // Node positions (x, y) within the 500x500 viewbox
-  const nodes = [
-    { x: 120, y: 80, r: 3, delay: 0 },
-    { x: 280, y: 50, r: 4, delay: 0.3 },
-    { x: 400, y: 110, r: 3, delay: 0.6 },
-    { x: 180, y: 180, r: 5, delay: 0.2 },
-    { x: 330, y: 200, r: 3.5, delay: 0.5 },
-    { x: 450, y: 180, r: 3, delay: 0.8 },
-    { x: 100, y: 300, r: 3, delay: 0.4 },
-    { x: 250, y: 320, r: 6, delay: 0.1 }, // central node — bigger
-    { x: 380, y: 290, r: 4, delay: 0.7 },
-    { x: 150, y: 420, r: 3.5, delay: 0.3 },
-    { x: 310, y: 430, r: 3, delay: 0.6 },
-    { x: 440, y: 380, r: 3.5, delay: 0.9 },
-  ];
-
-  // Edges between nearby nodes
-  const edges = [
-    [0, 1], [1, 2], [0, 3], [1, 4], [2, 5],
-    [3, 4], [4, 5], [3, 6], [3, 7], [4, 7],
-    [4, 8], [5, 8], [6, 7], [7, 8], [6, 9],
-    [7, 10], [8, 11], [9, 10], [10, 11], [7, 9],
-  ];
-
-  return (
-    <svg viewBox="0 0 500 500" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        {/* Glow filter for nodes */}
-        <filter id="nodeGlow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="6" result="blur" />
-          <feMerge>
-            <feMergeNode in="blur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-        {/* Gradient for the central node */}
-        <radialGradient id="centralGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#34d399" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="#34d399" stopOpacity="0" />
-        </radialGradient>
-      </defs>
-
-      {/* Edges */}
-      {edges.map(([a, b], i) => (
-        <line
-          key={`e-${i}`}
-          x1={nodes[a].x} y1={nodes[a].y}
-          x2={nodes[b].x} y2={nodes[b].y}
-          stroke="#34d399"
-          strokeOpacity="0.08"
-          strokeWidth="1"
-          className="constellation-edge"
-          style={{ animationDelay: `${i * 0.15}s` }}
-        />
-      ))}
-
-      {/* Data pulse along edges */}
-      {[0, 3, 6, 10, 14, 18].map((edgeIdx) => {
-        const [a, b] = edges[edgeIdx];
-        return (
-          <circle
-            key={`pulse-${edgeIdx}`}
-            r="2"
-            fill="#34d399"
-            opacity="0.5"
-          >
-            <animateMotion
-              dur={`${3 + edgeIdx * 0.5}s`}
-              repeatCount="indefinite"
-              path={`M${nodes[a].x},${nodes[a].y} L${nodes[b].x},${nodes[b].y}`}
-            />
-            <animate
-              attributeName="opacity"
-              values="0;0.6;0"
-              dur={`${3 + edgeIdx * 0.5}s`}
-              repeatCount="indefinite"
-            />
-          </circle>
-        );
-      })}
-
-      {/* Central glow */}
-      <circle cx={250} cy={320} r="40" fill="url(#centralGlow)" className="constellation-pulse" />
-
-      {/* Nodes */}
-      {nodes.map((node, i) => (
-        <g key={`n-${i}`} filter="url(#nodeGlow)">
-          <circle
-            cx={node.x}
-            cy={node.y}
-            r={node.r}
-            fill="#34d399"
-            opacity={i === 7 ? 0.8 : 0.4}
-            className="constellation-node"
-            style={{ animationDelay: `${node.delay}s` }}
-          />
-        </g>
-      ))}
-    </svg>
-  );
-}
-
-/* ── Hero Mockup — realistic product preview ────────────────────────── */
-function HeroMockup() {
-  return (
-    <div className="relative">
-      <div className="rounded-xl border border-zinc-800/70 bg-zinc-900/50 backdrop-blur-sm overflow-hidden shadow-2xl shadow-black/50 text-left">
-        {/* Titlebar */}
-        <div className="flex items-center px-3.5 py-2 border-b border-zinc-800/60 bg-zinc-950/60">
-          <div className="flex gap-1.5">
-            <div className="h-2.5 w-2.5 rounded-full bg-zinc-700/70" />
-            <div className="h-2.5 w-2.5 rounded-full bg-zinc-700/70" />
-            <div className="h-2.5 w-2.5 rounded-full bg-zinc-700/70" />
-          </div>
-          <div className="flex-1 flex justify-center">
-            <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-              <div className="h-2 w-2 rounded-full bg-neon-400/60" />
-              Research Assistant
-            </div>
-          </div>
-        </div>
-
-        {/* Layout */}
-        <div className="flex min-h-[320px] md:min-h-[380px]">
-          {/* Sidebar */}
-          <div className="hidden md:flex flex-col w-48 border-r border-zinc-800/50 bg-zinc-950/50 p-2.5 text-[11px]">
-            <div className="text-[9px] uppercase tracking-[0.08em] text-zinc-600 px-2 mb-1.5">Chats</div>
-            {["Market analysis Q1", "Competitor deep-dive", "Product roadmap"].map((c, i) => (
-              <div
-                key={c}
-                className={`flex items-center gap-1.5 rounded-md px-2 py-1.5 truncate ${
-                  i === 0 ? "bg-zinc-800/50 text-zinc-200" : "text-zinc-600"
-                }`}
-              >
-                <MessageSquare className="h-3 w-3 shrink-0 opacity-40" />
-                {c}
-              </div>
-            ))}
-
-            <div className="mt-auto border-t border-zinc-800/40 pt-2 space-y-0.5">
-              <div className="text-[9px] uppercase tracking-[0.08em] text-zinc-600 px-2 mb-1">Pages</div>
-              {[
-                { name: "Tasks", color: "text-amber-400/60" },
-                { name: "Notes", color: "text-blue-400/60" },
-                { name: "Data", color: "text-purple-400/60" },
-              ].map((p) => (
-                <div key={p.name} className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-zinc-600">
-                  <div className={`h-1.5 w-1.5 rounded-sm ${p.color} bg-current`} />
-                  {p.name}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Chat */}
-          <div className="flex-1 flex flex-col">
-            <div className="flex-1 p-4 md:p-5 space-y-3.5">
-              {/* User */}
-              <div className="flex justify-end">
-                <div className="rounded-xl rounded-br-sm bg-zinc-800/60 border border-zinc-700/30 px-3.5 py-2 text-[13px] text-zinc-300 max-w-xs md:max-w-sm">
-                  Research the latest trends in AI agent frameworks and organize the findings
-                </div>
-              </div>
-
-              {/* Agent */}
-              <div className="flex gap-2.5">
-                <div className="h-6 w-6 rounded-md bg-neon-400/10 ring-1 ring-neon-400/15 flex items-center justify-center shrink-0 mt-0.5">
-                  <Bot className="h-3 w-3 text-neon-400" />
-                </div>
-                <div className="space-y-2 max-w-xs md:max-w-md">
-                  {/* Tool calls — the part that makes this product different */}
-                  <div className="flex flex-wrap gap-1.5">
-                    {[
-                      { icon: Globe, name: "web_search", c: "text-neon-400" },
-                      { icon: Brain, name: "store_memory", c: "text-purple-400" },
-                      { icon: FileText, name: "save_note", c: "text-blue-400" },
-                    ].map((t) => (
-                      <div
-                        key={t.name}
-                        className="inline-flex items-center gap-1 rounded-md bg-zinc-800/40 border border-zinc-700/20 px-2 py-0.5 text-[10px] text-zinc-500"
-                      >
-                        <t.icon className={`h-2.5 w-2.5 ${t.c}`} />
-                        {t.name}
-                        <Check className="h-2.5 w-2.5 text-neon-400/70" />
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="rounded-xl rounded-bl-sm bg-zinc-900/60 border border-zinc-800/40 px-3.5 py-2 text-[13px] text-zinc-400 leading-relaxed">
-                    I've found 3 major trends in agent frameworks for 2026. I saved the key findings to your{" "}
-                    <span className="text-blue-400">Research Notes</span> page and stored the important data points in memory for future reference.
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Input */}
-            <div className="px-4 pb-3">
-              <div className="flex items-center rounded-lg border border-zinc-800/50 bg-zinc-950/50 px-3.5 py-2.5">
-                <span className="text-[13px] text-zinc-700 flex-1">Message your agent...</span>
-                <div className="h-6 w-6 rounded-md bg-zinc-800 flex items-center justify-center">
-                  <ArrowRight className="h-3 w-3 text-zinc-500" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Edge glow */}
-      <div className="absolute -bottom-6 left-[10%] right-[10%] h-20 bg-neon-400/[0.03] blur-[60px] rounded-full" />
-    </div>
-  );
-}
-
-/* ── Marquee — scrolling tool names ─────────────────────────────────── */
-function Marquee() {
+/* ── Trust Bar — replaces the old Marquee ───────────────────────────── */
+function TrustBar() {
   const tools = [
     "web_search", "store_memory", "recall_memory", "create_task", "save_note",
     "send_email", "schedule_action", "fire_webhook", "search_documents",
@@ -472,14 +311,14 @@ function Marquee() {
   ];
 
   return (
-    <div className="relative py-8 mt-8 border-y border-zinc-800/30 overflow-hidden">
-      <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-zinc-950 to-transparent z-10" />
-      <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-zinc-950 to-transparent z-10" />
-      <div className="flex gap-4 marquee-scroll">
+    <div className="relative py-6 border-y border-zinc-800/20 overflow-hidden bg-zinc-950">
+      <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-zinc-950 to-transparent z-10" />
+      <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-zinc-950 to-transparent z-10" />
+      <div className="flex gap-6 marquee-scroll">
         {[...tools, ...tools].map((t, i) => (
           <span
             key={`${t}-${i}`}
-            className="shrink-0 text-[11px] font-mono text-zinc-700 whitespace-nowrap"
+            className="shrink-0 text-[11px] font-mono text-zinc-700/70 whitespace-nowrap"
           >
             {t}()
           </span>
@@ -489,22 +328,23 @@ function Marquee() {
   );
 }
 
-/* ── What It Does — asymmetric feature blocks ───────────────────────── */
+/* ── What It Does — redesigned feature showcase ──────────────────────── */
 function WhatItDoes() {
-  const { ref, inView } = useInView(0.1);
+  const { ref, inView } = useInView(0.08);
 
   return (
-    <section id="what" ref={ref} className="relative max-w-6xl mx-auto px-6 py-24 md:py-32">
-      <div className="mb-16">
+    <section id="what" ref={ref} className="relative max-w-7xl mx-auto px-6 py-28 md:py-36">
+      {/* Section header */}
+      <div className="text-center mb-20">
         <p
-          className={`text-[11px] font-mono uppercase tracking-[0.15em] text-neon-400/70 mb-3 transition-all duration-700 ${
+          className={`text-[11px] font-mono uppercase tracking-[0.2em] text-neon-400/70 mb-4 transition-all duration-700 ${
             inView ? "opacity-100" : "opacity-0"
           }`}
         >
-          What HiGantic does
+          The platform
         </p>
         <h2
-          className={`text-2xl md:text-4xl font-bold tracking-tight leading-tight max-w-lg transition-all duration-700 ${
+          className={`text-3xl md:text-5xl font-bold tracking-tight leading-tight max-w-2xl mx-auto transition-all duration-700 ${
             inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
           style={{ transitionDelay: "80ms" }}
@@ -515,148 +355,249 @@ function WhatItDoes() {
         </h2>
       </div>
 
-      {/* Bento-ish grid — deliberately asymmetric */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-        {/* Large — Memory */}
-        <FeatureBlock
-          className="md:col-span-7"
+      {/* Feature grid — 2x2 with spotlight cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Memory */}
+        <FeatureCard
           inView={inView}
-          delay={120}
+          delay={100}
+          icon={Brain}
+          iconColor="text-neon-400"
           label="Memory"
-          title="Remembers everything, forgets nothing"
+          title="Remembers everything"
           desc="Agents store facts, preferences, and context across every conversation. They recall what matters, when it matters."
+          accentColor="neon"
         >
-          <div className="mt-4 space-y-1.5 font-mono text-[11px]">
+          <div className="mt-5 space-y-2 font-mono text-[11px]">
             {[
-              { cat: "preference", val: "User prefers concise bullet points" },
-              { cat: "fact", val: "Q1 revenue target: $2.4M" },
-              { cat: "context", val: "Working on competitor analysis project" },
+              { cat: "preference", val: "User prefers concise bullet points", color: "text-neon-400/60" },
+              { cat: "fact", val: "Q1 revenue target: $2.4M", color: "text-blue-400/60" },
+              { cat: "context", val: "Working on competitor analysis", color: "text-purple-400/60" },
             ].map((m, i) => (
-              <div key={i} className="flex gap-2 text-zinc-600">
-                <span className="text-neon-400/50 shrink-0">[{m.cat}]</span>
+              <div
+                key={i}
+                className="flex items-start gap-2 rounded-lg bg-zinc-950/60 border border-zinc-800/30 px-3 py-2"
+              >
+                <span className={`${m.color} shrink-0 mt-px`}>[{m.cat}]</span>
                 <span className="text-zinc-500">{m.val}</span>
               </div>
             ))}
           </div>
-        </FeatureBlock>
+        </FeatureCard>
 
-        {/* Small — Tools */}
-        <FeatureBlock
-          className="md:col-span-5"
+        {/* Tools */}
+        <FeatureCard
           inView={inView}
-          delay={200}
+          delay={180}
+          icon={Layers}
+          iconColor="text-blue-400"
           label="Tools"
           title="50+ built-in capabilities"
-          desc="Web search, email, Slack, Notion, Google Workspace, webhooks, scheduled actions, and custom HTTP endpoints."
+          desc="Web search, email, Slack, Notion, Google Workspace, webhooks, scheduled actions, and custom endpoints."
+          accentColor="blue"
         >
-          <div className="mt-4 flex flex-wrap gap-1.5">
+          <div className="mt-5 grid grid-cols-3 gap-2">
             {[
-              { icon: Globe, c: "text-neon-400/50" },
-              { icon: Mail, c: "text-rose-400/50" },
-              { icon: Database, c: "text-purple-400/50" },
-              { icon: Workflow, c: "text-amber-400/50" },
-              { icon: Shield, c: "text-cyan-400/50" },
-              { icon: Webhook, c: "text-orange-400/50" },
+              { icon: Globe, name: "Search", c: "text-neon-400/60" },
+              { icon: Mail, name: "Email", c: "text-rose-400/60" },
+              { icon: Database, name: "RAG", c: "text-purple-400/60" },
+              { icon: Workflow, name: "Actions", c: "text-amber-400/60" },
+              { icon: Shield, name: "Vault", c: "text-cyan-400/60" },
+              { icon: Webhook, name: "Hooks", c: "text-orange-400/60" },
             ].map((t, i) => (
-              <div key={i} className="h-8 w-8 rounded-md border border-zinc-800/50 bg-zinc-900/30 flex items-center justify-center">
-                <t.icon className={`h-3.5 w-3.5 ${t.c}`} />
+              <div
+                key={i}
+                className="flex items-center gap-2 rounded-lg border border-zinc-800/40 bg-zinc-950/40 px-3 py-2.5 group hover:border-zinc-700/50 transition-colors"
+              >
+                <t.icon className={`h-3.5 w-3.5 ${t.c} group-hover:opacity-100 opacity-70 transition-opacity`} />
+                <span className="text-[11px] text-zinc-500 group-hover:text-zinc-400 transition-colors">{t.name}</span>
               </div>
             ))}
           </div>
-        </FeatureBlock>
+        </FeatureCard>
 
-        {/* Small — Pages */}
-        <FeatureBlock
-          className="md:col-span-5"
+        {/* Pages */}
+        <FeatureCard
           inView={inView}
-          delay={280}
+          delay={260}
+          icon={FileText}
+          iconColor="text-purple-400"
           label="Pages"
           title="A workspace per agent"
           desc="Kanban tasks, markdown notes, spreadsheets, data tables — agents create and manage them autonomously."
+          accentColor="purple"
         >
-          <div className="mt-4 grid grid-cols-3 gap-1.5">
-            {["Tasks", "Notes", "Sheets"].map((p) => (
-              <div key={p} className="rounded-md border border-zinc-800/40 bg-zinc-950/30 px-2 py-3 text-center">
-                <div className="text-[10px] text-zinc-600">{p}</div>
+          <div className="mt-5 flex gap-2">
+            {[
+              { name: "Tasks", icon: "kanban", color: "border-amber-500/20 text-amber-400/70" },
+              { name: "Notes", icon: "doc", color: "border-blue-500/20 text-blue-400/70" },
+              { name: "Sheets", icon: "grid", color: "border-purple-500/20 text-purple-400/70" },
+            ].map((p) => (
+              <div
+                key={p.name}
+                className={`flex-1 rounded-lg border ${p.color} bg-zinc-950/40 p-3 text-center hover:bg-zinc-950/60 transition-colors`}
+              >
+                <div className={`text-lg mb-1 ${p.color}`}>
+                  {p.icon === "kanban" ? "▦" : p.icon === "doc" ? "◫" : "⊞"}
+                </div>
+                <div className="text-[11px] text-zinc-500">{p.name}</div>
               </div>
             ))}
           </div>
-        </FeatureBlock>
+        </FeatureCard>
 
-        {/* Large — Automations */}
-        <FeatureBlock
-          className="md:col-span-7"
+        {/* Automations */}
+        <FeatureCard
           inView={inView}
-          delay={360}
+          delay={340}
+          icon={Clock}
+          iconColor="text-amber-400"
           label="Automations"
           title="Runs while you sleep"
-          desc="Event-driven workflows trigger on task creation, email receipt, or any custom event. Cron schedules keep agents working around the clock."
+          desc="Event-driven workflows trigger on task creation, email receipt, or any custom event. Cron schedules keep agents working 24/7."
+          accentColor="amber"
         >
-          <div className="mt-4 font-mono text-[11px] space-y-1">
-            <div className="text-zinc-600">
-              <span className="text-amber-400/60">on</span> task.created <span className="text-zinc-700">→</span> send_slack_message
-            </div>
-            <div className="text-zinc-600">
-              <span className="text-amber-400/60">on</span> email.received <span className="text-zinc-700">→</span> store_memory → create_task
-            </div>
-            <div className="text-zinc-600">
-              <span className="text-cyan-400/60">cron</span> 0 9 * * 1 <span className="text-zinc-700">→</span> weekly_report
-            </div>
+          <div className="mt-5 font-mono text-[11px] space-y-2">
+            {[
+              { trigger: "on", event: "task.created", arrow: "→", action: "send_slack_message", color: "text-amber-400/60" },
+              { trigger: "on", event: "email.received", arrow: "→", action: "store_memory → create_task", color: "text-amber-400/60" },
+              { trigger: "cron", event: "0 9 * * 1", arrow: "→", action: "weekly_report", color: "text-cyan-400/60" },
+            ].map((row, i) => (
+              <div key={i} className="flex items-center gap-2 rounded-lg bg-zinc-950/60 border border-zinc-800/30 px-3 py-2 text-zinc-600">
+                <span className={row.color}>{row.trigger}</span>
+                <span className="text-zinc-500">{row.event}</span>
+                <span className="text-zinc-700">{row.arrow}</span>
+                <span className="text-zinc-400">{row.action}</span>
+              </div>
+            ))}
           </div>
-        </FeatureBlock>
+        </FeatureCard>
       </div>
     </section>
   );
 }
 
-function FeatureBlock({
-  className = "",
+function FeatureCard({
   inView,
   delay,
+  icon: Icon,
+  iconColor,
   label,
   title,
   desc,
+  accentColor,
   children,
 }: {
-  className?: string;
   inView: boolean;
   delay: number;
+  icon: React.ComponentType<{ className?: string }>;
+  iconColor: string;
   label: string;
   title: string;
   desc: string;
+  accentColor: "neon" | "blue" | "purple" | "amber";
   children?: React.ReactNode;
 }) {
+  const glowMap = {
+    neon: "hover:shadow-neon-400/[0.03]",
+    blue: "hover:shadow-blue-400/[0.03]",
+    purple: "hover:shadow-purple-400/[0.03]",
+    amber: "hover:shadow-amber-400/[0.03]",
+  };
+
   return (
     <div
-      className={`rounded-xl border border-zinc-800/50 bg-zinc-900/20 p-5 transition-all duration-700 hover:border-zinc-700/50 hover:bg-zinc-900/30 ${className} ${
-        inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+      className={`group relative rounded-2xl border border-zinc-800/50 bg-zinc-900/20 p-6 md:p-8 transition-all duration-700 hover:border-zinc-700/60 hover:bg-zinc-900/30 hover:shadow-2xl ${glowMap[accentColor]} ${
+        inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
       }`}
       style={{ transitionDelay: `${delay}ms` }}
     >
-      <p className="text-[10px] font-mono uppercase tracking-[0.12em] text-neon-400/50 mb-2">{label}</p>
-      <h3 className="text-base font-semibold text-zinc-200 mb-1">{title}</h3>
-      <p className="text-[13px] text-zinc-500 leading-relaxed">{desc}</p>
+      {/* Icon + label header */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className={`h-9 w-9 rounded-xl bg-zinc-900/80 border border-zinc-800/50 flex items-center justify-center group-hover:border-zinc-700/60 transition-colors`}>
+          <Icon className={`h-4 w-4 ${iconColor}`} />
+        </div>
+        <span className="text-[10px] font-mono uppercase tracking-[0.15em] text-zinc-600">{label}</span>
+      </div>
+
+      <h3 className="text-lg md:text-xl font-semibold text-zinc-200 mb-2">{title}</h3>
+      <p className="text-[13px] text-zinc-500 leading-relaxed max-w-md">{desc}</p>
       {children}
     </div>
   );
 }
 
-/* ── Show Don't Tell — interactive-looking agent flow ───────────────── */
+/* ── Show Don't Tell — vertical timeline ─────────────────────────────── */
 function ShowDontTell() {
-  const { ref, inView } = useInView(0.1);
+  const { ref, inView } = useInView(0.08);
+
+  const steps = [
+    {
+      n: "01",
+      title: "Describe your agent in plain language",
+      body: "Talk to the creator agent. Describe what you need — it asks clarifying questions, suggests tools, and builds your agent through conversation.",
+      visual: (
+        <div className="space-y-2 text-[12px] font-mono">
+          <div className="rounded-lg bg-zinc-800/40 border border-zinc-700/20 px-3.5 py-2.5">
+            <span className="text-zinc-500">you:</span>{" "}
+            <span className="text-zinc-300">I need an agent that monitors competitor pricing</span>
+          </div>
+          <div className="rounded-lg bg-neon-400/5 border border-neon-400/10 px-3.5 py-2.5">
+            <span className="text-neon-400/70">creator:</span>{" "}
+            <span className="text-zinc-400">I'll set up web search, memory, and a daily cron schedule. Should it post updates to Slack?</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      n: "02",
+      title: "It selects the right tools automatically",
+      body: "Based on your description, the creator selects from 17+ tool sets — memory, web search, pages, email, Slack, Notion, Google, and more.",
+      visual: (
+        <div className="flex flex-wrap gap-2 text-[11px] font-mono">
+          {["memory", "web_search", "pages", "slack", "schedules"].map((t) => (
+            <span
+              key={t}
+              className="text-neon-400/70 border border-neon-400/20 rounded-lg px-3 py-1.5 bg-neon-400/5 hover:bg-neon-400/10 transition-colors"
+            >
+              {t}
+            </span>
+          ))}
+        </div>
+      ),
+    },
+    {
+      n: "03",
+      title: "Your agent goes live instantly",
+      body: "Deployed with its own workspace, conversation history, memory store, and pages. Chat with it, run automations, or expose it as an API.",
+      visual: (
+        <div className="flex items-center gap-4 text-[12px] font-mono">
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-neon-400 status-pulse" />
+            <span className="text-neon-400/80">active</span>
+          </div>
+          <div className="h-3 w-px bg-zinc-800" />
+          <span className="text-zinc-500">3 pages</span>
+          <div className="h-3 w-px bg-zinc-800" />
+          <span className="text-zinc-500">cron: 0 9 * * *</span>
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <section id="how" ref={ref} className="relative max-w-6xl mx-auto px-6 py-24 md:py-32">
-      <div className="mb-16">
+    <section id="how" ref={ref} className="relative max-w-7xl mx-auto px-6 py-28 md:py-36">
+      {/* Header */}
+      <div className="text-center mb-20">
         <p
-          className={`text-[11px] font-mono uppercase tracking-[0.15em] text-neon-400/70 mb-3 transition-all duration-700 ${
+          className={`text-[11px] font-mono uppercase tracking-[0.2em] text-neon-400/70 mb-4 transition-all duration-700 ${
             inView ? "opacity-100" : "opacity-0"
           }`}
         >
           How it works
         </p>
         <h2
-          className={`text-2xl md:text-4xl font-bold tracking-tight leading-tight max-w-lg transition-all duration-700 ${
+          className={`text-3xl md:text-5xl font-bold tracking-tight leading-tight max-w-2xl mx-auto transition-all duration-700 ${
             inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
           style={{ transitionDelay: "80ms" }}
@@ -667,70 +608,33 @@ function ShowDontTell() {
         </h2>
       </div>
 
-      {/* Vertical timeline — not horizontal cards */}
-      <div className="relative">
-        {/* Vertical line */}
-        <div className="absolute left-[19px] top-0 bottom-0 w-px bg-gradient-to-b from-neon-400/20 via-zinc-800/40 to-transparent hidden md:block" />
+      {/* Timeline */}
+      <div className="relative max-w-3xl mx-auto">
+        {/* Vertical connector */}
+        <div className="absolute left-6 md:left-8 top-0 bottom-0 w-px bg-gradient-to-b from-neon-400/30 via-zinc-800/40 to-transparent" />
 
-        <div className="space-y-10 md:space-y-14">
-          {[
-            {
-              n: "1",
-              title: "Talk to the creator agent",
-              body: "Describe what you want in plain language. The creator agent asks clarifying questions, suggests tools, and builds your agent's config through conversation.",
-              mono: (
-                <div className="space-y-1 text-[12px] font-mono">
-                  <div><span className="text-zinc-600">you:</span> <span className="text-zinc-400">I need an agent that monitors competitor pricing</span></div>
-                  <div><span className="text-neon-400/60">creator:</span> <span className="text-zinc-500">I'll set up web search, memory, and a daily cron schedule. Should it also post updates to Slack?</span></div>
-                </div>
-              ),
-            },
-            {
-              n: "2",
-              title: "It picks the right tools",
-              body: "Based on your description, the creator selects from 17+ tool sets — memory, web search, pages, email, Slack, Notion, Google, and more.",
-              mono: (
-                <div className="flex flex-wrap gap-1.5 text-[11px] font-mono">
-                  {["memory", "web_search", "pages", "slack", "schedules"].map((t) => (
-                    <span key={t} className="text-neon-400/50 border border-neon-400/15 rounded px-1.5 py-0.5 bg-neon-400/5">{t}</span>
-                  ))}
-                </div>
-              ),
-            },
-            {
-              n: "3",
-              title: "Your agent goes live",
-              body: "Instantly deployed with its own workspace, conversation history, memory store, and pages. Chat with it, let it run automations, or expose it as an API.",
-              mono: (
-                <div className="text-[12px] font-mono text-zinc-600">
-                  <span className="text-neon-400/70">status:</span> active &nbsp;
-                  <span className="text-zinc-700">|</span> &nbsp;
-                  <span className="text-zinc-500">3 pages</span> &nbsp;
-                  <span className="text-zinc-700">|</span> &nbsp;
-                  <span className="text-zinc-500">cron: 0 9 * * *</span>
-                </div>
-              ),
-            },
-          ].map((step, i) => (
+        <div className="space-y-16">
+          {steps.map((step, i) => (
             <div
               key={step.n}
-              className={`flex gap-5 md:gap-8 transition-all duration-700 ${
-                inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
+              className={`relative flex gap-6 md:gap-10 transition-all duration-700 ${
+                inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
               }`}
-              style={{ transitionDelay: `${200 + i * 120}ms` }}
+              style={{ transitionDelay: `${200 + i * 150}ms` }}
             >
               {/* Step marker */}
-              <div className="shrink-0 relative">
-                <div className="h-10 w-10 rounded-lg border border-zinc-800/60 bg-zinc-900/40 flex items-center justify-center text-sm font-bold text-zinc-600">
-                  {step.n}
+              <div className="shrink-0 relative z-10">
+                <div className="h-12 w-12 md:h-16 md:w-16 rounded-2xl border border-zinc-800/60 bg-zinc-900/60 backdrop-blur-sm flex items-center justify-center">
+                  <span className="text-sm md:text-base font-bold text-zinc-500">{step.n}</span>
                 </div>
               </div>
 
-              <div className="flex-1 pb-2">
-                <h3 className="text-lg font-semibold text-zinc-200 mb-1.5">{step.title}</h3>
-                <p className="text-[13px] text-zinc-500 leading-relaxed mb-3 max-w-lg">{step.body}</p>
-                <div className="rounded-lg border border-zinc-800/40 bg-zinc-950/30 px-4 py-3">
-                  {step.mono}
+              {/* Content */}
+              <div className="flex-1 pt-1">
+                <h3 className="text-lg md:text-xl font-semibold text-zinc-200 mb-2">{step.title}</h3>
+                <p className="text-[13px] text-zinc-500 leading-relaxed mb-5 max-w-lg">{step.body}</p>
+                <div className="rounded-xl border border-zinc-800/40 bg-zinc-900/20 p-4">
+                  {step.visual}
                 </div>
               </div>
             </div>
@@ -741,58 +645,68 @@ function ShowDontTell() {
   );
 }
 
-/* ── Tool Tape — horizontal scrolling tool grid ─────────────────────── */
+/* ── Tool Tape — capabilities grid ───────────────────────────────────── */
 function ToolTape() {
-  const { ref, inView } = useInView(0.1);
+  const { ref, inView } = useInView(0.08);
 
   const tools = [
-    { icon: Brain, name: "Memory", desc: "Store & recall across sessions" },
-    { icon: Globe, name: "Web Search", desc: "Search & fetch live data" },
-    { icon: FileText, name: "Pages", desc: "Notes, tasks, spreadsheets" },
-    { icon: Mail, name: "Email", desc: "Send via Resend or Gmail" },
-    { icon: Clock, name: "Schedules", desc: "Cron & interval triggers" },
-    { icon: Webhook, name: "Webhooks", desc: "Inbound & outbound hooks" },
-    { icon: Users, name: "Multi-Agent", desc: "Agent-to-agent delegation" },
-    { icon: Code2, name: "REST API", desc: "Expose agents as endpoints" },
-    { icon: Shield, name: "Credentials", desc: "AES-256 encrypted vault" },
-    { icon: Database, name: "RAG", desc: "Vector search on documents" },
-    { icon: Puzzle, name: "Custom Tools", desc: "Your own HTTP endpoints" },
-    { icon: Cpu, name: "Multi-Model", desc: "Claude, Gemini & more" },
+    { icon: Brain, name: "Memory", desc: "Store & recall across sessions", color: "group-hover:text-neon-400" },
+    { icon: Globe, name: "Web Search", desc: "Search & fetch live data", color: "group-hover:text-blue-400" },
+    { icon: FileText, name: "Pages", desc: "Notes, tasks, spreadsheets", color: "group-hover:text-purple-400" },
+    { icon: Mail, name: "Email", desc: "Send via Resend or Gmail", color: "group-hover:text-rose-400" },
+    { icon: Clock, name: "Schedules", desc: "Cron & interval triggers", color: "group-hover:text-amber-400" },
+    { icon: Webhook, name: "Webhooks", desc: "Inbound & outbound hooks", color: "group-hover:text-orange-400" },
+    { icon: Users, name: "Multi-Agent", desc: "Agent-to-agent delegation", color: "group-hover:text-cyan-400" },
+    { icon: Code2, name: "REST API", desc: "Expose agents as endpoints", color: "group-hover:text-indigo-400" },
+    { icon: Shield, name: "Credentials", desc: "AES-256 encrypted vault", color: "group-hover:text-emerald-400" },
+    { icon: Database, name: "RAG", desc: "Vector search on documents", color: "group-hover:text-violet-400" },
+    { icon: Puzzle, name: "Custom Tools", desc: "Your own HTTP endpoints", color: "group-hover:text-pink-400" },
+    { icon: Cpu, name: "Multi-Model", desc: "Claude, Gemini & more", color: "group-hover:text-teal-400" },
   ];
 
   return (
-    <section ref={ref} className="py-20 md:py-28 border-t border-zinc-800/30">
-      <div className="max-w-6xl mx-auto px-6 mb-10">
-        <p
-          className={`text-[11px] font-mono uppercase tracking-[0.15em] text-neon-400/70 mb-3 transition-all duration-700 ${
-            inView ? "opacity-100" : "opacity-0"
-          }`}
-        >
-          Capabilities
-        </p>
-        <h2
-          className={`text-2xl md:text-3xl font-bold tracking-tight transition-all duration-700 ${
-            inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-          }`}
-          style={{ transitionDelay: "80ms" }}
-        >
-          Everything an agent needs. Nothing it doesn't.
-        </h2>
-      </div>
+    <section id="tools" ref={ref} className="py-28 md:py-36 border-t border-zinc-800/20">
+      <div className="max-w-7xl mx-auto px-6">
+        {/* Header */}
+        <div className="text-center mb-16">
+          <p
+            className={`text-[11px] font-mono uppercase tracking-[0.2em] text-neon-400/70 mb-4 transition-all duration-700 ${
+              inView ? "opacity-100" : "opacity-0"
+            }`}
+          >
+            Capabilities
+          </p>
+          <h2
+            className={`text-3xl md:text-4xl font-bold tracking-tight transition-all duration-700 ${
+              inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+            }`}
+            style={{ transitionDelay: "80ms" }}
+          >
+            Everything an agent needs.
+          </h2>
+          <p
+            className={`mt-3 text-zinc-500 max-w-md mx-auto transition-all duration-700 ${
+              inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+            }`}
+            style={{ transitionDelay: "140ms" }}
+          >
+            A complete toolkit for autonomous AI — no assembly required.
+          </p>
+        </div>
 
-      <div className="max-w-6xl mx-auto px-6">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+        {/* Tool grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {tools.map((tool, i) => (
             <div
               key={tool.name}
-              className={`group rounded-lg border border-zinc-800/40 bg-zinc-900/20 p-3.5 hover:border-zinc-700/50 hover:bg-zinc-900/40 transition-all duration-500 ${
+              className={`group relative rounded-xl border border-zinc-800/40 bg-zinc-900/20 p-4 hover:border-zinc-700/50 hover:bg-zinc-900/40 transition-all duration-500 cursor-default ${
                 inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
               }`}
-              style={{ transitionDelay: `${120 + i * 40}ms` }}
+              style={{ transitionDelay: `${180 + i * 35}ms` }}
             >
-              <tool.icon className="h-4 w-4 text-zinc-600 group-hover:text-neon-400/70 transition-colors mb-2.5" />
+              <tool.icon className={`h-5 w-5 text-zinc-600 ${tool.color} transition-colors mb-3`} />
               <div className="text-[13px] font-medium text-zinc-300">{tool.name}</div>
-              <div className="text-[11px] text-zinc-600 mt-0.5">{tool.desc}</div>
+              <div className="text-[11px] text-zinc-600 mt-1 leading-relaxed">{tool.desc}</div>
             </div>
           ))}
         </div>
@@ -854,17 +768,17 @@ function Pricing() {
   ];
 
   return (
-    <section id="pricing" ref={ref} className="max-w-6xl mx-auto px-6 py-24 md:py-32">
-      <div className="mb-14">
+    <section id="pricing" ref={ref} className="max-w-7xl mx-auto px-6 py-28 md:py-36">
+      <div className="text-center mb-16">
         <p
-          className={`text-[11px] font-mono uppercase tracking-[0.15em] text-neon-400/70 mb-3 transition-all duration-700 ${
+          className={`text-[11px] font-mono uppercase tracking-[0.2em] text-neon-400/70 mb-4 transition-all duration-700 ${
             inView ? "opacity-100" : "opacity-0"
           }`}
         >
           Pricing
         </p>
         <h2
-          className={`text-2xl md:text-4xl font-bold tracking-tight transition-all duration-700 ${
+          className={`text-3xl md:text-5xl font-bold tracking-tight transition-all duration-700 ${
             inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
           style={{ transitionDelay: "80ms" }}
@@ -873,40 +787,40 @@ function Pricing() {
         </h2>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
         {plans.map((plan, i) => (
           <div
             key={plan.name}
-            className={`relative rounded-xl border p-6 transition-all duration-700 ${
+            className={`relative rounded-2xl border p-7 transition-all duration-700 ${
               plan.featured
-                ? "border-neon-400/25 bg-neon-400/[0.03]"
-                : "border-zinc-800/50 bg-zinc-900/20"
+                ? "border-neon-400/25 bg-neon-400/[0.03] ring-1 ring-neon-400/10"
+                : "border-zinc-800/50 bg-zinc-900/20 hover:border-zinc-700/50"
             } ${inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"}`}
             style={{ transitionDelay: `${150 + i * 80}ms` }}
           >
             {plan.featured && (
-              <div className="absolute -top-2.5 left-4">
-                <span className="text-[10px] font-mono uppercase tracking-wider bg-neon-400 text-zinc-950 px-2 py-0.5 rounded font-semibold">
-                  Popular
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="text-[10px] font-mono uppercase tracking-wider bg-neon-400 text-zinc-950 px-3 py-1 rounded-full font-semibold">
+                  Most popular
                 </span>
               </div>
             )}
 
-            <div className="mb-5">
-              <h3 className="text-sm font-medium text-zinc-400">{plan.name}</h3>
-              <div className="flex items-baseline gap-1 mt-2">
-                <span className="text-3xl font-bold text-white">{plan.price}</span>
-                {plan.note && <span className="text-xs text-zinc-600">{plan.note}</span>}
+            <div className="mb-6">
+              <h3 className="text-sm font-medium text-zinc-400 mb-3">{plan.name}</h3>
+              <div className="flex items-baseline gap-1">
+                <span className="text-4xl font-bold text-white">{plan.price}</span>
+                {plan.note && <span className="text-sm text-zinc-600">{plan.note}</span>}
               </div>
             </div>
 
-            <div className="space-y-2.5 mb-6">
+            <div className="space-y-3 mb-8">
               {plan.items.map((item) => (
-                <div key={item.text} className="flex items-center gap-2.5 text-[13px]">
+                <div key={item.text} className="flex items-center gap-3 text-[13px]">
                   {item.included ? (
-                    <Check className="h-3.5 w-3.5 text-neon-400/70 shrink-0" />
+                    <Check className="h-4 w-4 text-neon-400/70 shrink-0" />
                   ) : (
-                    <Minus className="h-3.5 w-3.5 text-zinc-700 shrink-0" />
+                    <Minus className="h-4 w-4 text-zinc-700 shrink-0" />
                   )}
                   <span className={item.included ? "text-zinc-400" : "text-zinc-700"}>
                     {item.text}
@@ -917,9 +831,9 @@ function Pricing() {
 
             <SignInButton mode="modal">
               <button
-                className={`w-full text-[13px] font-medium py-2.5 rounded-lg transition-all ${
+                className={`w-full text-[13px] font-semibold py-3 rounded-xl transition-all ${
                   plan.featured
-                    ? "bg-neon-400 text-zinc-950 hover:bg-neon-300"
+                    ? "bg-neon-400 text-zinc-950 hover:bg-neon-300 glow-neon-sm"
                     : "border border-zinc-800 bg-zinc-900/40 text-zinc-300 hover:bg-zinc-800/60 hover:border-zinc-700"
                 }`}
               >
@@ -938,35 +852,36 @@ function BottomCTA() {
   const { ref, inView } = useInView();
 
   return (
-    <section ref={ref} className="relative border-t border-zinc-800/30 overflow-hidden">
-      {/* ── Background assets ── */}
-      {/* Radial gradient spotlight */}
+    <section ref={ref} className="relative border-t border-zinc-800/20 overflow-hidden">
+      {/* Background */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] bg-neon-400/[0.03] blur-[200px] rounded-full pointer-events-none" />
-      {/* Dot grid */}
-      <div className="absolute inset-0 hero-dot-grid opacity-[0.025] pointer-events-none" />
-      {/* Floating rings — right side decoration */}
-      <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none hidden md:block opacity-60">
+      <div className="absolute inset-0 hero-dot-grid opacity-[0.02] pointer-events-none" />
+
+      {/* Floating rings decoration */}
+      <div className="absolute right-0 top-1/2 -translate-y-1/2 pointer-events-none hidden md:block opacity-50">
         <CTARings />
       </div>
 
-      <div className="relative max-w-6xl mx-auto px-6 py-24 md:py-32">
+      <div className="relative max-w-7xl mx-auto px-6 py-28 md:py-36">
         <div
-          className={`max-w-2xl transition-all duration-700 ${
+          className={`max-w-2xl mx-auto text-center transition-all duration-700 ${
             inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
         >
-          <h2 className="text-2xl md:text-4xl font-bold tracking-tight mb-4">
+          <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-5">
             Stop configuring.
             <br />
-            <span className="text-neon-400">Start shipping agents.</span>
+            <span className="bg-gradient-to-r from-neon-400 via-neon-300 to-emerald-300 bg-clip-text text-transparent">
+              Start shipping agents.
+            </span>
           </h2>
-          <p className="text-zinc-500 text-base mb-8 max-w-lg">
+          <p className="text-zinc-500 text-lg mb-10 max-w-md mx-auto">
             Free to start. No credit card. Your first agent is a conversation away.
           </p>
           <SignInButton mode="modal">
-            <button className="group text-sm font-medium bg-neon-400 text-zinc-950 px-6 py-3 rounded-lg hover:bg-neon-300 transition-all glow-neon-sm">
+            <button className="group text-sm font-semibold bg-neon-400 text-zinc-950 px-8 py-4 rounded-xl hover:bg-neon-300 transition-all glow-neon">
               Get started free
-              <ArrowRight className="inline ml-1.5 h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+              <ArrowRight className="inline ml-2 h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
             </button>
           </SignInButton>
         </div>
@@ -986,31 +901,19 @@ function CTARings() {
           <stop offset="100%" stopColor="#34d399" stopOpacity="0" />
         </radialGradient>
       </defs>
-
-      {/* Center glow */}
       <circle cx="200" cy="200" r="120" fill="url(#ctaCenterGlow)" />
-
-      {/* Ring 1 — inner */}
       <circle cx="200" cy="200" r="60" fill="none" stroke="#34d399" strokeOpacity="0.08" strokeWidth="0.75" />
-      {/* Ring 2 — mid */}
       <circle cx="200" cy="200" r="110" fill="none" stroke="#34d399" strokeOpacity="0.06" strokeWidth="0.75" strokeDasharray="4 8" className="cta-ring-spin" />
-      {/* Ring 3 — outer */}
       <circle cx="200" cy="200" r="160" fill="none" stroke="#34d399" strokeOpacity="0.04" strokeWidth="0.75" strokeDasharray="2 12" className="cta-ring-spin-reverse" />
-
-      {/* Orbiting node on ring 1 */}
-      <circle r="3" fill="#34d399" opacity="0.6" className="cta-orbit-1">
+      <circle r="3" fill="#34d399" opacity="0.6">
         <animateMotion dur="12s" repeatCount="indefinite" path="M200,140 A60,60 0 1,1 199.99,140" />
       </circle>
-      {/* Orbiting node on ring 2 */}
-      <circle r="2.5" fill="#60a5fa" opacity="0.5" className="cta-orbit-2">
+      <circle r="2.5" fill="#60a5fa" opacity="0.5">
         <animateMotion dur="20s" repeatCount="indefinite" path="M200,90 A110,110 0 1,1 199.99,90" />
       </circle>
-      {/* Orbiting node on ring 3 */}
       <circle r="2" fill="#34d399" opacity="0.3">
         <animateMotion dur="30s" repeatCount="indefinite" path="M200,40 A160,160 0 1,1 199.99,40" />
       </circle>
-
-      {/* Center dot */}
       <circle cx="200" cy="200" r="4" fill="#34d399" opacity="0.5" className="constellation-pulse" />
       <circle cx="200" cy="200" r="2" fill="#34d399" opacity="0.9" />
     </svg>
@@ -1020,17 +923,17 @@ function CTARings() {
 /* ── Footer ─────────────────────────────────────────────────────────── */
 function Footer() {
   return (
-    <footer className="border-t border-zinc-800/30">
-      <div className="max-w-6xl mx-auto px-6 py-10">
+    <footer className="border-t border-zinc-800/20">
+      <div className="max-w-7xl mx-auto px-6 py-12">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-          <div className="flex items-center gap-2 text-sm text-zinc-600">
-            <div className="h-5 w-5 rounded bg-neon-400/10 ring-1 ring-neon-400/20 overflow-hidden flex items-center justify-center">
-              <img src="/logo.png" alt="" className="h-3.5 w-3.5 object-contain" />
+          <div className="flex items-center gap-2.5 text-sm text-zinc-600">
+            <div className="h-6 w-6 rounded-md bg-neon-400/10 ring-1 ring-neon-400/20 overflow-hidden flex items-center justify-center">
+              <img src="/logo.png" alt="" className="h-4 w-4 object-contain" />
             </div>
             <span>&copy; {new Date().getFullYear()} HiGantic</span>
           </div>
 
-          <div className="flex items-center gap-5 text-[13px] text-zinc-600">
+          <div className="flex items-center gap-6 text-[13px] text-zinc-600">
             <Link to="/docs" className="hover:text-zinc-300 transition-colors">Docs</Link>
             <a href="#pricing" className="hover:text-zinc-300 transition-colors">Pricing</a>
             <a href="#" className="hover:text-zinc-300 transition-colors">Privacy</a>
