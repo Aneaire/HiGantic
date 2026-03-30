@@ -387,6 +387,7 @@
 
 .marquee-scroll {
   animation: marquee-scroll 30s linear infinite;
+  will-change: transform;
 }
 
 /* ── Hero dot grid background ─────────────────────────────────────── */
@@ -458,6 +459,7 @@
 
 .network-bubble {
   animation: network-float 5s ease-in-out infinite;
+  will-change: transform;
 }
 
 @keyframes network-line-draw {
@@ -478,10 +480,12 @@
 
 .cta-ring-spin {
   animation: cta-ring-spin 40s linear infinite;
+  will-change: transform;
 }
 
 .cta-ring-spin-reverse {
   animation: cta-ring-spin-reverse 60s linear infinite;
+  will-change: transform;
 }
 
 /* ── Clerk modal centering ─────────────────────────────────────────── */
@@ -515,5 +519,18 @@
   }
   ::-webkit-scrollbar-thumb:hover {
     background: rgba(82, 82, 91, 0.7);
+  }
+}
+
+/* ── Accessibility: reduced motion ─────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

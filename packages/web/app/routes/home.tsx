@@ -1,20 +1,6 @@
-import { useQuery, useMutation } from "convex/react";
-import { api } from "@agent-maker/shared/convex/_generated/api";
 import { Show, SignInButton } from "@clerk/react";
-import { DashboardLayout } from "~/components/DashboardLayout";
-import { AgentCard } from "~/components/AgentCard";
-import { OnboardingOverlay } from "~/components/OnboardingOverlay";
 import {
-  Plus,
-  Bot,
-  Sparkles,
-  MessageSquare,
   Brain,
-  Search,
-  LayoutGrid,
-  List,
-  Crown,
-  Zap,
   Globe,
   Database,
   Mail,
@@ -24,7 +10,6 @@ import {
   Check,
   Terminal,
   FileText,
-  Table2,
   Webhook,
   Clock,
   Users,
@@ -35,28 +20,14 @@ import {
   ArrowUpRight,
   Minus,
   Layers,
-  Eye,
-  Rocket,
-  Command,
 } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  rectSortingStrategy,
-} from "@dnd-kit/sortable";
 import type { Route } from "./+types/home";
 
 const HeroScene = lazy(() => import("~/components/three/HeroScene"));
 const IntegrationNetwork = lazy(() => import("~/components/IntegrationNetwork"));
+const DashboardView = lazy(() => import("~/components/DashboardView"));
 
 export function meta(_args: Route.MetaArgs) {
   return [
@@ -76,9 +47,13 @@ export default function HomePage() {
         <LandingPage />
       </Show>
       <Show when="signed-in">
-        <DashboardLayout>
+        <Suspense fallback={
+          <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+            <div className="h-8 w-8 rounded-lg bg-neon-400/10 animate-pulse" />
+          </div>
+        }>
           <DashboardView />
-        </DashboardLayout>
+        </Suspense>
       </Show>
     </>
   );
@@ -90,7 +65,7 @@ export default function HomePage() {
 
 function LandingPage() {
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 overflow-x-hidden">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 overflow-x-clip">
       <LandingNav />
       <Hero />
       <TrustBar />
@@ -128,6 +103,8 @@ function useInView(threshold = 0.15) {
   return { ref, inView };
 }
 
+const COPYRIGHT_YEAR = new Date().getFullYear();
+
 /* ── Model Slide Badge ──────────────────────────────────────────────── */
 /*
  * SUPPORTED_MODELS: When adding a new AI model to the platform, add it here.
@@ -151,10 +128,10 @@ function LandingNav() {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+      className={`fixed top-0 left-0 right-0 z-50 transition-[background-color,box-shadow,backdrop-filter] duration-500 border-b ${
         scrolled
-          ? "bg-zinc-950/80 backdrop-blur-2xl border-b border-zinc-800/40 shadow-lg shadow-black/20"
-          : "bg-transparent"
+          ? "bg-zinc-950/80 backdrop-blur-2xl border-zinc-800/40 shadow-lg shadow-black/20"
+          : "bg-transparent border-transparent"
       }`}
     >
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -216,28 +193,16 @@ function Hero() {
       {/* ── Content ── */}
       <div className="relative z-[3] max-w-7xl mx-auto px-6 pt-24 pb-20 w-full">
         <div className="max-w-2xl">
-          {/* Model badge */}
-          <div className="inline-flex items-center gap-2 rounded-full border border-zinc-700/50 bg-zinc-900/70 backdrop-blur-xl px-4 py-1.5 mb-8 fade-in-up-slow">
-            <div className="h-1.5 w-1.5 rounded-full bg-neon-400 status-pulse" />
-            <span className="text-[11px] text-zinc-400">Powered by</span>
-            <div className="h-[16px] overflow-hidden">
-              <div className="model-slider-track">
-                {SUPPORTED_MODELS.map((m) => (
-                  <div key={m.name} className="h-[16px] flex items-center">
-                    <span className={`text-[11px] font-semibold ${m.color}`}>{m.name}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
           <h1
             className="text-[clamp(2.8rem,7vw,5rem)] font-bold leading-[1.05] tracking-tight fade-in-up-slow"
             style={{ animationDelay: "0.1s" }}
           >
             Your ideas deserve
             <br />
-            <span className="bg-gradient-to-r from-neon-400 via-neon-300 to-emerald-300 bg-clip-text text-transparent">
+            <span
+              className="bg-gradient-to-r from-neon-400 via-neon-300 to-emerald-300 bg-clip-text text-transparent"
+              style={{ filter: "drop-shadow(0 0 28px rgba(52, 211, 153, 0.4)) drop-shadow(0 0 64px rgba(52, 211, 153, 0.15))" }}
+            >
               agents that ship.
             </span>
           </h1>
@@ -264,11 +229,11 @@ function Hero() {
             </SignInButton>
             <Link
               to="/docs"
-              className="group flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-100 transition-colors px-2 py-3.5"
+              className="group flex items-center gap-2 text-sm font-medium text-zinc-300 border border-zinc-700 hover:border-zinc-500 hover:text-zinc-100 px-6 py-3.5 rounded-xl transition-all hover:bg-zinc-800/50"
             >
               <Terminal className="h-4 w-4" />
               Read the docs
-              <ArrowUpRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <ArrowUpRight className="h-3 w-3 opacity-50 group-hover:opacity-100 transition-opacity" />
             </Link>
           </div>
 
@@ -281,22 +246,57 @@ function Hero() {
               { value: "50+", label: "Built-in tools" },
               { value: "< 2min", label: "To deploy" },
               { value: "24/7", label: "Autonomous" },
-            ].map((stat) => (
-              <div key={stat.label} className="text-left">
-                <div className="text-xl font-bold text-zinc-100">{stat.value}</div>
-                <div className="text-[11px] text-zinc-600 mt-0.5">{stat.label}</div>
+            ].map((stat, i) => (
+              <div key={stat.label} className="flex items-center gap-8">
+                <div className="text-left">
+                  <div className="text-xl font-bold text-zinc-100">{stat.value}</div>
+                  <div className="text-xs text-zinc-500 mt-0.5">{stat.label}</div>
+                </div>
+                {i < 2 && <div className="w-px h-8 bg-zinc-800" />}
               </div>
             ))}
+          </div>
+
+          {/* Social proof */}
+          <div
+            className="mt-10 flex items-center gap-3 fade-in-up-slow"
+            style={{ animationDelay: "0.5s" }}
+          >
+            <div className="flex -space-x-2">
+              {[
+                "bg-gradient-to-br from-neon-400 to-emerald-600",
+                "bg-gradient-to-br from-blue-400 to-indigo-600",
+                "bg-gradient-to-br from-amber-400 to-orange-600",
+                "bg-gradient-to-br from-pink-400 to-rose-600",
+                "bg-gradient-to-br from-violet-400 to-purple-600",
+              ].map((gradient, i) => (
+                <div
+                  key={i}
+                  className={`h-7 w-7 rounded-full ${gradient} ring-2 ring-zinc-950 flex items-center justify-center text-[10px] font-bold text-white/90`}
+                >
+                  {["A", "M", "J", "S", "R"][i]}
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="h-3 w-3 fill-amber-400 text-amber-400" />
+                ))}
+              </div>
+              <span className="text-xs text-zinc-500">
+                Trusted by <span className="text-zinc-300 font-medium">500+</span> builders
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ── Scroll indicator ── */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[3] fade-in-up-slow" style={{ animationDelay: "0.6s" }}>
-        <div className="flex flex-col items-center gap-2">
-          <span className="text-[10px] text-zinc-600 uppercase tracking-[0.15em]">Scroll</span>
-          <div className="w-px h-8 bg-gradient-to-b from-zinc-600 to-transparent scroll-indicator" />
-        </div>
+      {/* ── Subtle scroll chevron ── */}
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[3] fade-in-up-slow" style={{ animationDelay: "0.6s" }}>
+        <svg className="w-5 h-5 text-zinc-700 scroll-indicator" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
       </div>
     </section>
   );
@@ -931,7 +931,7 @@ function Footer() {
             <div className="h-6 w-6 rounded-md bg-neon-400/10 ring-1 ring-neon-400/20 overflow-hidden flex items-center justify-center">
               <img src="/logo.png" alt="" className="h-4 w-4 object-contain" />
             </div>
-            <span>&copy; {new Date().getFullYear()} HiGantic</span>
+            <span>&copy; {COPYRIGHT_YEAR} HiGantic</span>
           </div>
 
           <div className="flex items-center gap-6 text-[13px] text-zinc-600">
@@ -946,215 +946,3 @@ function Footer() {
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   DASHBOARD VIEW — Authenticated user's agent management
-   ═══════════════════════════════════════════════════════════════════════ */
-
-function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
-}
-
-function PlanToggle() {
-  const user = useQuery(api.users.me);
-  const togglePlan = useMutation(api.users.togglePlan);
-  const [toggling, setToggling] = useState(false);
-
-  if (!user) return null;
-
-  const isPro = user.plan === "pro" || user.plan === "enterprise";
-
-  async function handleToggle() {
-    setToggling(true);
-    try {
-      await togglePlan();
-    } catch (err: any) {
-      console.error("Failed to toggle plan:", err);
-    }
-    setToggling(false);
-  }
-
-  return (
-    <button
-      onClick={handleToggle}
-      disabled={toggling}
-      className={`group flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-medium transition-all ${
-        isPro
-          ? "bg-gradient-to-r from-amber-500/15 to-orange-500/15 border border-amber-500/30 text-amber-300 hover:border-amber-500/50"
-          : "bg-zinc-800/60 border border-zinc-700/60 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300"
-      }`}
-    >
-      {isPro ? (
-        <Crown className="h-3.5 w-3.5 text-amber-400" />
-      ) : (
-        <Zap className="h-3.5 w-3.5" />
-      )}
-      <span>{isPro ? "Pro" : "Free"}</span>
-      <div
-        className={`relative h-4 w-8 rounded-full transition-colors ${
-          isPro ? "bg-amber-500/30" : "bg-zinc-700"
-        }`}
-      >
-        <div
-          className={`absolute top-0.5 h-3 w-3 rounded-full transition-all ${
-            isPro ? "left-[18px] bg-amber-400" : "left-0.5 bg-zinc-500"
-          }`}
-        />
-      </div>
-    </button>
-  );
-}
-
-function DashboardView() {
-  const agents = useQuery(api.agents.list);
-  const user = useQuery(api.users.me);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [searchFocused, setSearchFocused] = useState(false);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-
-  const visibleAgents = agents?.filter((a) => a.status !== "draft");
-
-  // Show onboarding for new users who haven't completed it and have no agents
-  useEffect(() => {
-    if (
-      user &&
-      agents &&
-      !user.hasCompletedOnboarding &&
-      agents.filter((a) => a.status !== "draft").length === 0
-    ) {
-      setShowOnboarding(true);
-    }
-  }, [user, agents]);
-  const filteredAgents = visibleAgents?.filter(
-    (a) =>
-      !searchQuery.trim() ||
-      a.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      a.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
-  );
-
-  function handleDragEnd(event: DragEndEvent) {
-    // Reordering logic — for now just visual feedback
-  }
-
-  return (
-    <div>
-      {showOnboarding && (
-        <OnboardingOverlay onComplete={() => setShowOnboarding(false)} />
-      )}
-
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight">{getGreeting()}</h1>
-            <PlanToggle />
-          </div>
-          {filteredAgents && (
-            <p className="mt-1 text-sm text-zinc-500">
-              {filteredAgents.length} agent{filteredAgents.length !== 1 ? "s" : ""}
-              {user && (
-                <span className="text-zinc-600">
-                  {" "}/{" "}{user.maxAgents} max
-                </span>
-              )}
-            </p>
-          )}
-        </div>
-        <Link
-          to="/agents/new"
-          className="flex items-center gap-2 rounded-xl bg-neon-400 px-5 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-neon-300 transition-all glow-neon-sm hover:shadow-lg hover:shadow-neon-400/20"
-        >
-          <Plus className="h-4 w-4" />
-          New Agent
-        </Link>
-      </div>
-
-      {visibleAgents && visibleAgents.length > 0 && (
-        <div className="flex items-center gap-3 mb-6">
-          <div className={`relative transition-all duration-300 ${searchFocused ? "flex-1 max-w-sm" : "flex-1 max-w-xs"}`}>
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-              placeholder="Search agents..."
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-900/50 pl-10 pr-4 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:outline-none focus-glow transition-all"
-            />
-          </div>
-          <div className="flex items-center rounded-lg border border-zinc-800 bg-zinc-900/50 p-1">
-            <button
-              onClick={() => setViewMode("grid")}
-              className={`p-1.5 rounded-md transition-colors ${
-                viewMode === "grid" ? "bg-zinc-800 text-zinc-200" : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={`p-1.5 rounded-md transition-colors ${
-                viewMode === "list" ? "bg-zinc-800 text-zinc-200" : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              <List className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {filteredAgents === undefined ? (
-        <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : "space-y-3"}>
-          {[1, 2, 3].map((i) => (
-            <div key={i} className={`rounded-2xl border border-zinc-800/60 bg-zinc-900/30 animate-pulse ${viewMode === "grid" ? "h-40" : "h-20"}`} />
-          ))}
-        </div>
-      ) : filteredAgents.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="relative mb-6">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-900 ring-1 ring-zinc-800">
-              <Bot className="h-8 w-8 text-zinc-700" />
-            </div>
-            <div className="absolute -top-2 -right-2 h-3 w-3 rounded-full bg-neon-400/20" />
-            <div className="absolute -bottom-1 -left-3 h-2 w-2 rounded-full bg-zinc-700/40" />
-          </div>
-          {searchQuery ? (
-            <>
-              <p className="text-zinc-400 font-medium">No agents found</p>
-              <p className="mt-1 text-sm text-zinc-600">Try a different search term</p>
-            </>
-          ) : (
-            <>
-              <p className="text-zinc-400 font-medium">No agents yet</p>
-              <p className="mt-1 text-sm text-zinc-600">Create your first agent to get started</p>
-              <Link
-                to="/agents/new"
-                className="mt-5 flex items-center gap-2 rounded-xl bg-zinc-800 px-5 py-2.5 text-sm font-medium text-zinc-200 hover:bg-zinc-700 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                Create your first agent
-              </Link>
-            </>
-          )}
-        </div>
-      ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={filteredAgents.map((a) => a._id)} strategy={rectSortingStrategy}>
-            <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" : "space-y-3"}>
-              {filteredAgents.map((agent) => (
-                <AgentCard key={agent._id} agent={agent} isDraggable={true} />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
-      )}
-    </div>
-  );
-}
