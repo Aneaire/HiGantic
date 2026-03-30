@@ -83,6 +83,7 @@ export function AgentSidebar({ agent }: { agent: Doc<"agents"> }) {
   const updateTitle = useMutation(api.conversations.updateTitle);
   const removeConversation = useMutation(api.conversations.remove);
   const createTab = useMutation(api.sidebarTabs.create);
+  const updateTab = useMutation(api.sidebarTabs.update);
   const removeTab = useMutation(api.sidebarTabs.remove);
   const [showAddPage, setShowAddPage] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -90,7 +91,10 @@ export function AgentSidebar({ agent }: { agent: Doc<"agents"> }) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteTabId, setDeleteTabId] = useState<string | null>(null);
   const [deleteTabConfirm, setDeleteTabConfirm] = useState("");
+  const [renamingTabId, setRenamingTabId] = useState<string | null>(null);
+  const [renamingTabLabel, setRenamingTabLabel] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
+  const tabRenameInputRef = useRef<HTMLInputElement>(null);
 
   const conversationGroups = useMemo(
     () => (conversations ? groupConversationsByTime(conversations) : null),
@@ -123,6 +127,17 @@ export function AgentSidebar({ agent }: { agent: Doc<"agents"> }) {
     });
     setShowAddPage(false);
     navigate(`/agents/${agent._id}/tab/${tabId}`);
+    setRenamingTabId(tabId);
+    setRenamingTabLabel("");
+  }
+
+  async function handleTabRenameSubmit(tabId: string, fallbackLabel: string) {
+    const trimmed = renamingTabLabel.trim();
+    if (trimmed && trimmed !== fallbackLabel) {
+      await updateTab({ tabId: tabId as any, label: trimmed });
+    }
+    setRenamingTabId(null);
+    setRenamingTabLabel("");
   }
 
   return (
@@ -204,6 +219,7 @@ export function AgentSidebar({ agent }: { agent: Doc<"agents"> }) {
           <div className="space-y-0.5">
             {tabs.map((tab) => {
               const isActive = location.pathname.includes(`/tab/${tab._id}`);
+              const isRenaming = renamingTabId === tab._id;
               return (
                 <div
                   key={tab._id}
@@ -213,23 +229,71 @@ export function AgentSidebar({ agent }: { agent: Doc<"agents"> }) {
                       : "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-300"
                   }`}
                 >
-                  <Link
-                    to={`/agents/${agent._id}/tab/${tab._id}`}
-                    className="flex items-center gap-2.5 flex-1 px-3 py-2 min-w-0"
-                  >
-                    {TAB_ICONS[tab.type] ?? <LayoutGrid className="h-4 w-4" />}
-                    <span className="truncate">{tab.label}</span>
-                  </Link>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setDeleteTabId(tab._id);
-                      setDeleteTabConfirm("");
-                    }}
-                    className="hidden group-hover:block pr-2"
-                  >
-                    <Trash2 className="h-3 w-3 text-zinc-600 hover:text-red-400 transition-colors" />
-                  </button>
+                  {isRenaming ? (
+                    <form
+                      className="flex items-center gap-2.5 flex-1 px-3 py-2 min-w-0"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleTabRenameSubmit(tab._id, tab.label);
+                      }}
+                    >
+                      {TAB_ICONS[tab.type] ?? <LayoutGrid className="h-4 w-4" />}
+                      <input
+                        ref={tabRenameInputRef}
+                        value={renamingTabLabel}
+                        onChange={(e) => setRenamingTabLabel(e.target.value)}
+                        onBlur={() => handleTabRenameSubmit(tab._id, tab.label)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") {
+                            setRenamingTabId(null);
+                            setRenamingTabLabel("");
+                          }
+                        }}
+                        placeholder={tab.label}
+                        className="flex-1 bg-transparent border-b border-zinc-600 text-sm text-zinc-100 outline-none min-w-0 placeholder-zinc-600"
+                        autoFocus
+                      />
+                      <button
+                        type="submit"
+                        onMouseDown={(e) => e.preventDefault()}
+                        className="p-0.5 text-zinc-500 hover:text-neon-400"
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                      </button>
+                    </form>
+                  ) : (
+                    <>
+                      <Link
+                        to={`/agents/${agent._id}/tab/${tab._id}`}
+                        className="flex items-center gap-2.5 flex-1 px-3 py-2 min-w-0"
+                      >
+                        {TAB_ICONS[tab.type] ?? <LayoutGrid className="h-4 w-4" />}
+                        <span className="truncate">{tab.label}</span>
+                      </Link>
+                      <div className="hidden group-hover:flex items-center gap-0.5 pr-2">
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setRenamingTabId(tab._id);
+                            setRenamingTabLabel(tab.label);
+                          }}
+                          className="p-1 rounded-md text-zinc-600 hover:text-zinc-300 hover:bg-zinc-700/50 transition-colors"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setDeleteTabId(tab._id);
+                            setDeleteTabConfirm("");
+                          }}
+                          className="p-1 rounded-md text-zinc-600 hover:text-red-400 hover:bg-zinc-700/50 transition-colors"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })}
