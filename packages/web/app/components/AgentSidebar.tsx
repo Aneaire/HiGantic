@@ -22,9 +22,11 @@ import {
   Check,
   ImageIcon,
   GitBranch,
+  Lock,
 } from "lucide-react";
 import { useState, useRef, useMemo } from "react";
 import type { Doc } from "@agent-maker/shared/convex/_generated/dataModel";
+import { PLAN_LIMITS } from "@agent-maker/shared/src/types";
 
 const TAB_ICONS: Record<string, React.ReactNode> = {
   tasks: <CheckSquare className="h-4 w-4" />,
@@ -43,6 +45,9 @@ const PAGE_TYPES = [
   { type: "api" as const, label: "REST API", description: "Expose agent as API", icon: Globe },
   { type: "workflow" as const, label: "Workflow", description: "Automations & schedules", icon: GitBranch },
 ];
+
+// Page types that can only be added once per agent
+const SINGLETON_PAGE_TYPES = new Set(["workflow", "api"]);
 
 function groupConversationsByTime(conversations: Doc<"conversations">[]) {
   const now = new Date();
@@ -73,6 +78,7 @@ export function AgentSidebar({ agent }: { agent: Doc<"agents"> }) {
     agentId: agent._id,
   });
   const tabs = useQuery(api.sidebarTabs.list, { agentId: agent._id });
+  const user = useQuery(api.users.me);
   const createConversation = useMutation(api.conversations.create);
   const updateTitle = useMutation(api.conversations.updateTitle);
   const removeConversation = useMutation(api.conversations.remove);
@@ -87,6 +93,19 @@ export function AgentSidebar({ agent }: { agent: Doc<"agents"> }) {
     () => (conversations ? groupConversationsByTime(conversations) : null),
     [conversations]
   );
+
+  const plan = (user?.plan as "free" | "pro" | "enterprise") ?? "free";
+
+  const availablePageTypes = useMemo(() => {
+    const allowed = new Set(PLAN_LIMITS[plan].allowedPageTypes);
+    const existingTypes = new Set(tabs?.map((t) => t.type) ?? []);
+    return PAGE_TYPES.filter(
+      (pt) => !SINGLETON_PAGE_TYPES.has(pt.type) || !existingTypes.has(pt.type)
+    ).map((pt) => ({
+      ...pt,
+      locked: !allowed.has(pt.type),
+    }));
+  }, [tabs, plan]);
 
   async function handleNewChat() {
     const id = await createConversation({ agentId: agent._id });
@@ -220,23 +239,42 @@ export function AgentSidebar({ agent }: { agent: Doc<"agents"> }) {
                 <X className="h-3 w-3" />
               </button>
             </div>
-            {PAGE_TYPES.map((pt) => {
+            {availablePageTypes.map((pt) => {
               const Icon = pt.icon;
               return (
                 <button
                   key={pt.type}
-                  onClick={() => handleAddPage(pt.type, pt.label)}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-zinc-300 hover:bg-zinc-800 transition-colors group"
+                  onClick={() => !pt.locked && handleAddPage(pt.type, pt.label)}
+                  disabled={pt.locked}
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs transition-colors group ${
+                    pt.locked
+                      ? "text-zinc-600 cursor-not-allowed"
+                      : "text-zinc-300 hover:bg-zinc-800"
+                  }`}
                 >
-                  <div className="flex h-7 w-7 items-center justify-center rounded-md bg-zinc-800 group-hover:bg-zinc-700 transition-colors">
-                    <Icon className="h-3.5 w-3.5 text-zinc-500 group-hover:text-zinc-300 transition-colors" />
+                  <div className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${
+                    pt.locked
+                      ? "bg-zinc-800/50"
+                      : "bg-zinc-800 group-hover:bg-zinc-700"
+                  }`}>
+                    <Icon className={`h-3.5 w-3.5 transition-colors ${
+                      pt.locked
+                        ? "text-zinc-700"
+                        : "text-zinc-500 group-hover:text-zinc-300"
+                    }`} />
                   </div>
-                  <div className="text-left">
+                  <div className="text-left flex-1">
                     <div className="font-medium">{pt.label}</div>
-                    <div className="text-zinc-600 text-[10px]">
+                    <div className={`text-[10px] ${pt.locked ? "text-zinc-700" : "text-zinc-600"}`}>
                       {pt.description}
                     </div>
                   </div>
+                  {pt.locked && (
+                    <div className="flex items-center gap-1 text-[9px] font-semibold text-amber-500/70 bg-amber-500/10 px-1.5 py-0.5 rounded-md">
+                      <Lock className="h-2.5 w-2.5" />
+                      PRO
+                    </div>
+                  )}
                 </button>
               );
             })}
