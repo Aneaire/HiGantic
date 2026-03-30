@@ -9,6 +9,7 @@ export default defineSchema({
     imageUrl: v.optional(v.string()),
     plan: v.union(v.literal("free"), v.literal("pro"), v.literal("enterprise")),
     maxAgents: v.number(),
+    hasCompletedOnboarding: v.optional(v.boolean()),
   }).index("by_clerk_id", ["clerkId"]),
 
   agents: defineTable({
@@ -233,6 +234,16 @@ export default defineSchema({
           id: v.string(),
           question: v.string(),
           options: v.array(v.string()),
+        })
+      )
+    ),
+    attachments: v.optional(
+      v.array(
+        v.object({
+          storageId: v.id("_storage"),
+          fileName: v.string(),
+          contentType: v.string(),
+          fileSize: v.number(),
         })
       )
     ),

@@ -45,6 +45,13 @@ export class AgentConvexClient {
     });
   }
 
+  async getAttachmentUrl(storageId: string): Promise<string | null> {
+    return this.client.query(api.agentApi.getAttachmentUrl, {
+      serverToken: this.serverToken,
+      storageId: storageId as any,
+    });
+  }
+
   // ── Mutations ──────────────────────────────────────────────────────
 
   async updateMessage(

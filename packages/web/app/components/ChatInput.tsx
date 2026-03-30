@@ -2,7 +2,23 @@ import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import {
   ArrowUp, Square, MessageSquare, ChevronDown, ChevronUp,
   Eye, Brain, ImagePlus, Search, Lock, Check, Sparkles,
+  Paperclip, X, FileText, Image as ImageIcon, Loader2,
 } from "lucide-react";
+import { useMutation } from "convex/react";
+import { api } from "@agent-maker/shared/convex/_generated/api";
+
+// ── Types ──────────────────────────────────────────────────────────────
+
+export interface ChatAttachment {
+  storageId: string;
+  fileName: string;
+  contentType: string;
+  fileSize: number;
+}
+
+interface PendingAttachment extends ChatAttachment {
+  previewUrl?: string;
+}
 
 // ── Provider icons ──────────────────────────────────────────────────────
 
@@ -132,6 +148,28 @@ function TierBadge({ tier }: { tier: string }) {
     tier === "$$" ? "text-zinc-400" :
     "text-zinc-600";
   return <span className={`text-[10px] font-mono ${color}`}>{tier}</span>;
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────
+
+const ACCEPTED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "application/pdf",
+  "text/plain",
+  "text/markdown",
+  "text/csv",
+  "application/json",
+];
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
 // ── Model Selector (all-in-one with open/close managed internally) ──────
@@ -476,7 +514,7 @@ export function ChatInput({
   configuredImageGenProviders,
   enabledModels,
 }: {
-  onSend: (content: string) => void;
+  onSend: (content: string, attachments?: ChatAttachment[]) => void;
   onStop?: () => void;
   isProcessing?: boolean;
   hasActiveQuestions?: boolean;
@@ -490,12 +528,98 @@ export function ChatInput({
   const [value, setValue] = useState("");
   const [showManualInput, setShowManualInput] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const generateUploadUrl = useMutation(api.storage.generateUploadUrl);
+
+  async function uploadFile(file: File): Promise<PendingAttachment | null> {
+    if (!ACCEPTED_TYPES.includes(file.type)) {
+      console.warn(`Unsupported file type: ${file.type}`);
+      return null;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      console.warn(`File too large: ${formatFileSize(file.size)} (max ${formatFileSize(MAX_FILE_SIZE)})`);
+      return null;
+    }
+
+    const uploadUrl = await generateUploadUrl();
+    const result = await fetch(uploadUrl, {
+      method: "POST",
+      headers: { "Content-Type": file.type },
+      body: file,
+    });
+    const { storageId } = await result.json();
+
+    const previewUrl = file.type.startsWith("image/")
+      ? URL.createObjectURL(file)
+      : undefined;
+
+    return {
+      storageId,
+      fileName: file.name,
+      contentType: file.type,
+      fileSize: file.size,
+      previewUrl,
+    };
+  }
+
+  async function handleFiles(files: FileList | File[]) {
+    setUploading(true);
+    try {
+      const results = await Promise.all(
+        Array.from(files).slice(0, 5).map(uploadFile)
+      );
+      const uploaded = results.filter(Boolean) as PendingAttachment[];
+      if (uploaded.length > 0) {
+        setAttachments((prev) => [...prev, ...uploaded]);
+      }
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleFileInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (e.target.files && e.target.files.length > 0) {
+      handleFiles(e.target.files);
+      e.target.value = "";
+    }
+  }
+
+  function removeAttachment(index: number) {
+    setAttachments((prev) => {
+      const removed = prev[index];
+      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
+      return prev.filter((_, i) => i !== index);
+    });
+  }
+
+  // Clean up preview URLs on unmount
+  useEffect(() => {
+    return () => {
+      attachments.forEach((a) => {
+        if (a.previewUrl) URL.revokeObjectURL(a.previewUrl);
+      });
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSubmit() {
     const trimmed = value.trim();
-    if (!trimmed || isProcessing) return;
-    onSend(trimmed);
+    if ((!trimmed && attachments.length === 0) || isProcessing) return;
+
+    const finalAttachments = attachments.length > 0
+      ? attachments.map(({ storageId, fileName, contentType, fileSize }) => ({
+          storageId,
+          fileName,
+          contentType,
+          fileSize,
+        }))
+      : undefined;
+
+    onSend(trimmed || "(attached files)", finalAttachments);
     setValue("");
+    setAttachments([]);
     setShowManualInput(false);
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -514,6 +638,24 @@ export function ChatInput({
     const el = e.target;
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, 200) + "px";
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(true);
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files.length > 0) {
+      handleFiles(e.dataTransfer.files);
+    }
   }
 
   if (hasActiveQuestions && !showManualInput) {
@@ -535,18 +677,71 @@ export function ChatInput({
     );
   }
 
-  const hasContent = value.trim().length > 0;
+  const hasContent = value.trim().length > 0 || attachments.length > 0;
 
   return (
     <div className="p-4 pb-5">
       <div className="max-w-3xl mx-auto">
         <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
           className={`relative rounded-2xl border bg-zinc-900/80 backdrop-blur-sm transition-all duration-300 shadow-inner shadow-black/10 ${
-            hasContent
-              ? "border-neon-400/30 shadow-lg shadow-neon-400/5"
-              : "border-zinc-800 hover:border-zinc-700"
+            dragOver
+              ? "border-neon-400/50 shadow-lg shadow-neon-400/10 bg-neon-400/5"
+              : hasContent
+                ? "border-neon-400/30 shadow-lg shadow-neon-400/5"
+                : "border-zinc-800 hover:border-zinc-700"
           }`}
         >
+          {/* Drag overlay */}
+          {dragOver && (
+            <div className="absolute inset-0 flex items-center justify-center rounded-2xl z-10 pointer-events-none">
+              <div className="flex items-center gap-2 text-neon-400 text-sm font-medium">
+                <Paperclip className="h-4 w-4" />
+                Drop files here
+              </div>
+            </div>
+          )}
+
+          {/* Attachment preview strip */}
+          {attachments.length > 0 && (
+            <div className="flex items-center gap-2 px-4 pt-3 pb-1 overflow-x-auto">
+              {attachments.map((att, i) => (
+                <div
+                  key={i}
+                  className="relative shrink-0 group/att"
+                >
+                  {att.previewUrl ? (
+                    <img
+                      src={att.previewUrl}
+                      alt={att.fileName}
+                      className="h-16 w-16 rounded-lg object-cover border border-zinc-700"
+                    />
+                  ) : (
+                    <div className="h-16 w-20 rounded-lg border border-zinc-700 bg-zinc-800/60 flex flex-col items-center justify-center gap-1 px-1">
+                      <FileText className="h-4 w-4 text-zinc-500" />
+                      <span className="text-[9px] text-zinc-500 truncate w-full text-center">
+                        {att.fileName}
+                      </span>
+                    </div>
+                  )}
+                  <button
+                    onClick={() => removeAttachment(i)}
+                    className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center opacity-0 group-hover/att:opacity-100 transition-opacity hover:bg-red-900/60 hover:border-red-700"
+                  >
+                    <X className="h-3 w-3 text-zinc-400" />
+                  </button>
+                </div>
+              ))}
+              {uploading && (
+                <div className="h-16 w-16 rounded-lg border border-zinc-700 bg-zinc-800/40 flex items-center justify-center shrink-0">
+                  <Loader2 className="h-4 w-4 text-zinc-500 animate-spin" />
+                </div>
+              )}
+            </div>
+          )}
+
           <textarea
             ref={textareaRef}
             value={value}
@@ -559,19 +754,44 @@ export function ChatInput({
           />
 
           <div className="flex items-center justify-between px-3 pb-2.5">
-            {model && onModelChange ? (
-              <ModelDropdown
-                model={model}
-                onModelChange={onModelChange}
-                imageGenModel={imageGenModel}
-                onImageGenModelChange={onImageGenModelChange}
-                configuredImageGenProviders={configuredImageGenProviders}
-                disabled={isProcessing}
-                enabledModels={enabledModels}
+            <div className="flex items-center gap-1">
+              {model && onModelChange ? (
+                <ModelDropdown
+                  model={model}
+                  onModelChange={onModelChange}
+                  imageGenModel={imageGenModel}
+                  onImageGenModelChange={onImageGenModelChange}
+                  configuredImageGenProviders={configuredImageGenProviders}
+                  disabled={isProcessing}
+                  enabledModels={enabledModels}
+                />
+              ) : (
+                <div />
+              )}
+
+              {/* Attach button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isProcessing || uploading}
+                className="flex items-center justify-center h-7 w-7 rounded-lg text-zinc-600 hover:text-zinc-400 hover:bg-zinc-800/80 disabled:opacity-40 transition-all"
+                title="Attach files"
+              >
+                {uploading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Paperclip className="h-3.5 w-3.5" />
+                )}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept={ACCEPTED_TYPES.join(",")}
+                onChange={handleFileInputChange}
+                className="hidden"
               />
-            ) : (
-              <div />
-            )}
+            </div>
 
             {isProcessing ? (
               <button

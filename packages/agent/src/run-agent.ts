@@ -249,10 +249,59 @@ export async function runAgent(params: RunAgentParams) {
       }));
 
     // Extract the latest user message as the prompt
-    const latestUserMsg = [...apiMessages]
+    const latestUserMsg = [...allMessages]
+      .filter((m: any) => m._id !== params.assistantMessageId)
       .reverse()
-      .find((m) => m.role === "user");
-    const prompt = latestUserMsg?.content ?? "";
+      .find((m: any) => m.role === "user");
+    let prompt = latestUserMsg?.content ?? "";
+
+    // Resolve attachments for the latest user message (multimodal support)
+    if (latestUserMsg?.attachments && latestUserMsg.attachments.length > 0) {
+      const attachmentParts: string[] = [];
+      for (const att of latestUserMsg.attachments as Array<{
+        storageId: string;
+        fileName: string;
+        contentType: string;
+        fileSize: number;
+      }>) {
+        const url = await convexClient.getAttachmentUrl(att.storageId);
+        if (!url) continue;
+
+        if (att.contentType.startsWith("image/")) {
+          attachmentParts.push(
+            `[Attached image: ${att.fileName}]\nImage URL: ${url}`
+          );
+        } else if (att.contentType === "application/pdf") {
+          attachmentParts.push(
+            `[Attached PDF: ${att.fileName} (${(att.fileSize / 1024).toFixed(1)}KB)]\nPDF URL: ${url}`
+          );
+        } else if (
+          att.contentType.startsWith("text/") ||
+          att.contentType === "application/json"
+        ) {
+          try {
+            const resp = await fetch(url, {
+              signal: AbortSignal.timeout(10000),
+            });
+            const text = await resp.text();
+            attachmentParts.push(
+              `[Attached file: ${att.fileName}]\n\`\`\`\n${text.slice(0, 50000)}\n\`\`\``
+            );
+          } catch {
+            attachmentParts.push(
+              `[Attached file: ${att.fileName}]\nFile URL: ${url}`
+            );
+          }
+        } else {
+          attachmentParts.push(
+            `[Attached file: ${att.fileName} (${att.contentType})]\nFile URL: ${url}`
+          );
+        }
+      }
+      if (attachmentParts.length > 0) {
+        prompt = `${prompt}\n\n---\n**User Attachments:**\n${attachmentParts.join("\n\n")}`;
+      }
+    }
 
     // Build conversation history (everything except the latest user message)
     const historyMessages = apiMessages.slice(0, -1);

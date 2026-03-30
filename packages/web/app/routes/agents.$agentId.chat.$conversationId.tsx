@@ -2,7 +2,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@agent-maker/shared/convex/_generated/api";
 import { useParams, useOutletContext, Link } from "react-router";
 import { ChatMessageList } from "~/components/ChatMessageList";
-import { ChatInput } from "~/components/ChatInput";
+import { ChatInput, type ChatAttachment } from "~/components/ChatInput";
 import type { Doc } from "@agent-maker/shared/convex/_generated/dataModel";
 import type { Id } from "@agent-maker/shared/convex/_generated/dataModel";
 import { useMemo } from "react";
@@ -77,11 +77,12 @@ export default function ChatPage() {
     (m) => m.status === "pending" || m.status === "processing"
   );
 
-  async function handleSend(content: string) {
+  async function handleSend(content: string, attachments?: ChatAttachment[]) {
     try {
       await sendMessage({
         conversationId: conversationId as Id<"conversations">,
         content,
+        attachments: attachments as any,
       });
     } catch (err: any) {
       console.error("Failed to send message:", err);

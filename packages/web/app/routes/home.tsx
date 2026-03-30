@@ -3,6 +3,7 @@ import { api } from "@agent-maker/shared/convex/_generated/api";
 import { Show, SignInButton } from "@clerk/react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { AgentCard } from "~/components/AgentCard";
+import { OnboardingOverlay } from "~/components/OnboardingOverlay";
 import {
   Plus,
   Bot,
@@ -1012,8 +1013,21 @@ function DashboardView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchFocused, setSearchFocused] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const visibleAgents = agents?.filter((a) => a.status !== "draft");
+
+  // Show onboarding for new users who haven't completed it and have no agents
+  useEffect(() => {
+    if (
+      user &&
+      agents &&
+      !user.hasCompletedOnboarding &&
+      agents.filter((a) => a.status !== "draft").length === 0
+    ) {
+      setShowOnboarding(true);
+    }
+  }, [user, agents]);
   const filteredAgents = visibleAgents?.filter(
     (a) =>
       !searchQuery.trim() ||
@@ -1031,6 +1045,10 @@ function DashboardView() {
 
   return (
     <div>
+      {showOnboarding && (
+        <OnboardingOverlay onComplete={() => setShowOnboarding(false)} />
+      )}
+
       <div className="flex items-center justify-between mb-8">
         <div>
           <div className="flex items-center gap-3">

@@ -710,6 +710,57 @@ function QuestionCards({
   );
 }
 
+// ── Attachment preview for user messages ────────────────────────────────
+
+function AttachmentPreview({
+  attachment,
+}: {
+  attachment: { storageId: string; fileName: string; contentType: string; fileSize: number };
+}) {
+  const url = useQuery(api.storage.getUrl, {
+    storageId: attachment.storageId as any,
+  });
+  const isImage = attachment.contentType.startsWith("image/");
+
+  if (isImage && url) {
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer">
+        <img
+          src={url}
+          alt={attachment.fileName}
+          className="max-h-48 max-w-64 rounded-xl border border-neon-400/20 object-cover hover:border-neon-400/40 transition-colors"
+        />
+      </a>
+    );
+  }
+
+  const formatSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes}B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+  };
+
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl border border-neon-400/20 bg-neon-400/5 px-3 py-2">
+      <FileText className="h-4 w-4 text-neon-400/60 shrink-0" />
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-zinc-200 truncate">{attachment.fileName}</p>
+        <p className="text-[10px] text-zinc-500">{formatSize(attachment.fileSize)}</p>
+      </div>
+      {url && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 text-zinc-500 hover:text-zinc-300 transition-colors"
+        >
+          <Download className="h-3.5 w-3.5" />
+        </a>
+      )}
+    </div>
+  );
+}
+
 // ── Main ChatMessage component ──────────────────────────────────────────
 
 export function ChatMessage({
@@ -728,12 +779,29 @@ export function ChatMessage({
 
   // ── User message ──────────────────────────────────────────────────────
   if (isUser) {
+    const userAttachments = (message as any).attachments as
+      | Array<{ storageId: string; fileName: string; contentType: string; fileSize: number }>
+      | undefined;
+
     return (
       <div className="flex gap-3 justify-end">
-        <div className="max-w-[75%] rounded-2xl rounded-br-md px-4 py-2.5 text-sm bg-neon-400/10 border border-neon-400/20 text-zinc-100">
-          <div className="whitespace-pre-wrap break-words">
-            {message.content}
-          </div>
+        <div className="max-w-[75%] space-y-2">
+          {/* Attachment previews */}
+          {userAttachments && userAttachments.length > 0 && (
+            <div className="flex flex-wrap gap-2 justify-end">
+              {userAttachments.map((att, i) => (
+                <AttachmentPreview key={i} attachment={att} />
+              ))}
+            </div>
+          )}
+          {/* Text content */}
+          {message.content && message.content !== "(attached files)" && (
+            <div className="rounded-2xl rounded-br-md px-4 py-2.5 text-sm bg-neon-400/10 border border-neon-400/20 text-zinc-100">
+              <div className="whitespace-pre-wrap break-words">
+                {message.content}
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-zinc-700/80 mt-0.5">
           <User className="h-4 w-4 text-zinc-300" />

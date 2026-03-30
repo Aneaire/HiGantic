@@ -5,6 +5,17 @@ import { internal } from "./_generated/api";
 
 // ── QUERIES ──────────────────────────────────────────────────────────
 
+export const getAttachmentUrl = query({
+  args: {
+    serverToken: v.string(),
+    storageId: v.id("_storage"),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    return await ctx.storage.getUrl(args.storageId);
+  },
+});
+
 export const getAgent = query({
   args: {
     serverToken: v.string(),

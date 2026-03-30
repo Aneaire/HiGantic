@@ -57,6 +57,14 @@ export const togglePlan = mutation({
   },
 });
 
+export const completeOnboarding = mutation({
+  handler: async (ctx) => {
+    const user = await getAuthUser(ctx);
+    if (!user) throw new Error("Not authenticated");
+    await ctx.db.patch(user._id, { hasCompletedOnboarding: true });
+  },
+});
+
 export const me = query({
   handler: async (ctx) => {
     return await getAuthUser(ctx);

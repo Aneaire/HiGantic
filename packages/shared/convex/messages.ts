@@ -23,6 +23,16 @@ export const send = mutation({
   args: {
     conversationId: v.id("conversations"),
     content: v.string(),
+    attachments: v.optional(
+      v.array(
+        v.object({
+          storageId: v.id("_storage"),
+          fileName: v.string(),
+          contentType: v.string(),
+          fileSize: v.number(),
+        })
+      )
+    ),
   },
   handler: async (ctx, args) => {
     const user = await requireAuthUser(ctx);
@@ -37,6 +47,9 @@ export const send = mutation({
       role: "user",
       content: args.content,
       status: "done",
+      ...(args.attachments && args.attachments.length > 0 && {
+        attachments: args.attachments,
+      }),
     });
 
     // Create placeholder assistant message
