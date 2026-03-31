@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "installCommand": "npm install",
+  "installCommand": "npm install --legacy-peer-deps",
   "buildCommand": "cd packages/web && npx react-router build",
   "outputDirectory": "packages/web/build/client",
   "rewrites": [
