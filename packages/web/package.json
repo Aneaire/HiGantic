@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "react-router dev",
-    "build": "react-router build && bun build/server/index.js",
+    "build": "react-router build",
     "start": "bun build/server/index.js",
     "typecheck": "tsc --noEmit"
   },
