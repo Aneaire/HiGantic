@@ -2,8 +2,8 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "cd ../.. && bun install",
-  "buildCommand": "bunx react-router build",
-  "outputDirectory": "build/client",
+  "buildCommand": "bunx react-router build && cp -r build/client/. dist/",
+  "outputDirectory": "dist",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
