@@ -1,0 +1,46 @@
+schema: paperclip/v1
+agents:
+  lead-developer:
+    adapter:
+      type: claude_local
+      config:
+        model: claude-sonnet-4-6
+    inputs:
+      env:
+        GH_TOKEN:
+          kind: secret
+          requirement: optional
+
+  qa-engineer:
+    adapter:
+      type: claude_local
+      config:
+        model: claude-sonnet-4-6
+
+  product-strategist:
+    adapter:
+      type: claude_local
+      config:
+        model: claude-sonnet-4-6
+
+  creative-director:
+    adapter:
+      type: claude_local
+      config:
+        model: claude-sonnet-4-6
+    inputs:
+      env:
+        GEMINI_API_KEY:
+          kind: secret
+          requirement: required
+
+  devops-engineer:
+    adapter:
+      type: claude_local
+      config:
+        model: claude-sonnet-4-6
+    inputs:
+      env:
+        GH_TOKEN:
+          kind: secret
+          requirement: optional
