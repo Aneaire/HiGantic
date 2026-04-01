@@ -99,6 +99,352 @@ function getEventStyle(eventName: string): string {
   return "text-zinc-400 bg-zinc-800/60 ring-zinc-700/40";
 }
 
+// ── Workflow Templates ───────────────────────────────────────────────
+
+type WorkflowTemplate = {
+  name: string;
+  description: string;
+  category: string;
+  categoryColor: string;
+  trigger: { event: string; filter?: any };
+  actions: Array<{ type: ActionType; config: any }>;
+};
+
+const WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
+  // ── Gmail ──────────────────────────────────────────────────────────
+  {
+    name: "Log sent emails to a note",
+    description: "Every time you send an email via Gmail, create a note with the recipient and subject for easy tracking.",
+    category: "Gmail",
+    categoryColor: "text-red-400",
+    trigger: { event: "gmail.sent" },
+    actions: [
+      {
+        type: "create_note",
+        config: {
+          title: "Email sent: {{event.subject}}",
+          content: "**To:** {{event.to}}\n**Subject:** {{event.subject}}\n**Message ID:** {{event.gmailMessageId}}\n**Thread:** {{event.threadId}}",
+        },
+      },
+    ],
+  },
+  {
+    name: "Create follow-up task after sending email",
+    description: "Automatically create a follow-up task whenever you send an email, so nothing falls through the cracks.",
+    category: "Gmail",
+    categoryColor: "text-red-400",
+    trigger: { event: "gmail.sent" },
+    actions: [
+      {
+        type: "create_task",
+        config: {
+          title: "Follow up on: {{event.subject}}",
+          priority: "medium",
+          description: "Follow up with {{event.to}} regarding the email sent.",
+        },
+      },
+    ],
+  },
+  {
+    name: "Alert on failed email",
+    description: "When a Gmail send fails, run a prompt to investigate and retry or notify you.",
+    category: "Gmail",
+    categoryColor: "text-red-400",
+    trigger: { event: "gmail.failed" },
+    actions: [
+      {
+        type: "run_prompt",
+        config: {
+          prompt: "An email to {{event.to}} with subject '{{event.subject}}' failed to send. Log this failure to memory and create a high-priority task to retry or investigate the issue.",
+        },
+      },
+    ],
+  },
+  {
+    name: "Store email thread in memory",
+    description: "When you reply to an email, save the thread context to memory for future reference.",
+    category: "Gmail",
+    categoryColor: "text-red-400",
+    trigger: { event: "gmail.replied" },
+    actions: [
+      {
+        type: "store_memory",
+        config: {
+          content: "Email thread reply — To: {{event.to}}, Subject: {{event.subject}}, Thread: {{event.threadId}}",
+          category: "email",
+        },
+      },
+    ],
+  },
+  // ── Tasks ──────────────────────────────────────────────────────────
+  {
+    name: "Email confirmation when task is completed",
+    description: "Send a Gmail notification whenever a task is marked as done.",
+    category: "Tasks",
+    categoryColor: "text-blue-400",
+    trigger: { event: "task.updated", filter: { status: "done" } },
+    actions: [
+      {
+        type: "run_prompt",
+        config: {
+          prompt: "Task '{{event.title}}' was just marked as done. Send a brief completion summary email via Gmail to confirm it's finished. Keep it professional and concise.",
+        },
+      },
+    ],
+  },
+  {
+    name: "Log new tasks to memory",
+    description: "Every new task gets stored in memory so the agent always knows what's on the backlog.",
+    category: "Tasks",
+    categoryColor: "text-blue-400",
+    trigger: { event: "task.created" },
+    actions: [
+      {
+        type: "store_memory",
+        config: {
+          content: "New task created: {{event.title}} — Priority: {{event.priority}}, Status: {{event.status}}",
+          category: "tasks",
+        },
+      },
+    ],
+  },
+  {
+    name: "Summarize high-priority task completion",
+    description: "When a high-priority task is completed, run a prompt to write a brief summary and store it.",
+    category: "Tasks",
+    categoryColor: "text-blue-400",
+    trigger: { event: "task.updated", filter: { status: "done", priority: "high" } },
+    actions: [
+      {
+        type: "run_prompt",
+        config: {
+          prompt: "High-priority task '{{event.title}}' was just completed. Write a 2-3 sentence summary of what was accomplished and store it in memory under category 'completed-tasks'.",
+        },
+      },
+    ],
+  },
+  // ── Google Calendar ────────────────────────────────────────────────
+  {
+    name: "Create prep task for new calendar event",
+    description: "Whenever a new calendar event is created, automatically generate a preparation task.",
+    category: "Google Calendar",
+    categoryColor: "text-indigo-400",
+    trigger: { event: "gcal.event_created" },
+    actions: [
+      {
+        type: "create_task",
+        config: {
+          title: "Prepare for: {{event.title}}",
+          priority: "medium",
+          description: "Event starts: {{event.start}}. Prepare agenda, materials, and any required follow-ups.",
+        },
+      },
+    ],
+  },
+  {
+    name: "Store meeting briefing in memory",
+    description: "When a calendar event is created, ask the agent to research and store a briefing note.",
+    category: "Google Calendar",
+    categoryColor: "text-indigo-400",
+    trigger: { event: "gcal.event_created" },
+    actions: [
+      {
+        type: "run_prompt",
+        config: {
+          prompt: "A new calendar event was created: '{{event.title}}' starting at {{event.start}}. Create a concise meeting briefing with talking points and store it in memory under category 'meetings'.",
+        },
+      },
+    ],
+  },
+  {
+    name: "Log calendar changes to notes",
+    description: "Keep a running note of all calendar updates — useful for audit trails or personal logs.",
+    category: "Google Calendar",
+    categoryColor: "text-indigo-400",
+    trigger: { event: "gcal.event_updated" },
+    actions: [
+      {
+        type: "create_note",
+        config: {
+          title: "Calendar update: {{event.title}}",
+          content: "**Event:** {{event.title}}\n**New start:** {{event.start}}\n**New end:** {{event.end}}\n**Event ID:** {{event.eventId}}",
+        },
+      },
+    ],
+  },
+  // ── Google Sheets ──────────────────────────────────────────────────
+  {
+    name: "Summarize new spreadsheet rows",
+    description: "When rows are appended to a Google Sheet, run a prompt to summarize and store the new data.",
+    category: "Google Sheets",
+    categoryColor: "text-emerald-400",
+    trigger: { event: "gsheets.rows_appended" },
+    actions: [
+      {
+        type: "run_prompt",
+        config: {
+          prompt: "{{event.rowCount}} new row(s) were appended to spreadsheet {{event.spreadsheetId}}. Read the latest rows from the sheet, summarize what was added, and store the summary in memory.",
+        },
+      },
+    ],
+  },
+  {
+    name: "Create task when sheet data is written",
+    description: "Trigger a review task whenever data is written to a critical spreadsheet range.",
+    category: "Google Sheets",
+    categoryColor: "text-emerald-400",
+    trigger: { event: "gsheets.data_written" },
+    actions: [
+      {
+        type: "create_task",
+        config: {
+          title: "Review spreadsheet update: {{event.range}}",
+          priority: "low",
+          description: "{{event.rowCount}} rows updated in range {{event.range}} of spreadsheet {{event.spreadsheetId}}. Review the changes.",
+        },
+      },
+    ],
+  },
+  // ── Google Drive ───────────────────────────────────────────────────
+  {
+    name: "Note new Drive files",
+    description: "Every time a file is created in Google Drive, log it in a note for easy reference.",
+    category: "Google Drive",
+    categoryColor: "text-blue-400",
+    trigger: { event: "gdrive.file_created" },
+    actions: [
+      {
+        type: "create_note",
+        config: {
+          title: "New file: {{event.name}}",
+          content: "**File:** {{event.name}}\n**Type:** {{event.type}}\n**MIME:** {{event.mimeType}}\n**Link:** {{event.webViewLink}}\n**File ID:** {{event.fileId}}",
+        },
+      },
+    ],
+  },
+  // ── Webhooks ───────────────────────────────────────────────────────
+  {
+    name: "Create task from incoming webhook",
+    description: "Turn any incoming webhook into a task automatically — great for integrating external tools.",
+    category: "Webhooks",
+    categoryColor: "text-purple-400",
+    trigger: { event: "webhook.received" },
+    actions: [
+      {
+        type: "create_task",
+        config: {
+          title: "Webhook action required",
+          priority: "medium",
+          description: "Incoming webhook received. Review and process the payload.",
+        },
+      },
+    ],
+  },
+  {
+    name: "Run AI analysis on webhook payload",
+    description: "When a webhook arrives, let the agent analyze its payload and store key insights.",
+    category: "Webhooks",
+    categoryColor: "text-purple-400",
+    trigger: { event: "webhook.received" },
+    actions: [
+      {
+        type: "run_prompt",
+        config: {
+          prompt: "An incoming webhook was received. Analyze the event data, extract any important information, and store a structured summary in memory.",
+        },
+      },
+    ],
+  },
+  // ── Notes ──────────────────────────────────────────────────────────
+  {
+    name: "Extract and store note insights",
+    description: "When a new note is created, run a prompt to extract key points and store them in memory.",
+    category: "Notes",
+    categoryColor: "text-green-400",
+    trigger: { event: "note.created" },
+    actions: [
+      {
+        type: "run_prompt",
+        config: {
+          prompt: "A new note titled '{{event.title}}' was created. Read it and extract the 3-5 most important insights or action items, then store them in memory under category 'note-insights'.",
+        },
+      },
+    ],
+  },
+];
+
+const TEMPLATE_CATEGORIES = [...new Set(WORKFLOW_TEMPLATES.map((t) => t.category))];
+
+function TemplatesPicker({
+  onSelect,
+  onClose,
+}: {
+  onSelect: (template: WorkflowTemplate) => void;
+  onClose: () => void;
+}) {
+  const [activeCategory, setActiveCategory] = useState("All");
+  const categories = ["All", ...TEMPLATE_CATEGORIES];
+  const filtered =
+    activeCategory === "All"
+      ? WORKFLOW_TEMPLATES
+      : WORKFLOW_TEMPLATES.filter((t) => t.category === activeCategory);
+
+  return (
+    <div className="rounded-2xl border border-zinc-800/60 bg-zinc-900/50 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/60">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-3.5 w-3.5 text-neon-400" />
+          <span className="text-xs font-semibold text-zinc-200">Choose a template</span>
+        </div>
+        <button onClick={onClose} className="text-zinc-600 hover:text-zinc-400 transition-colors">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {/* Category filter */}
+      <div className="flex gap-1 px-4 py-2.5 border-b border-zinc-800/40 flex-wrap">
+        {categories.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setActiveCategory(cat)}
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors ${
+              activeCategory === cat
+                ? "bg-zinc-700 text-zinc-200"
+                : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
+            }`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {/* Template grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 max-h-80 overflow-y-auto">
+        {filtered.map((tpl, i) => (
+          <button
+            key={i}
+            onClick={() => onSelect(tpl)}
+            className="group text-left rounded-xl border border-zinc-800/60 bg-zinc-800/20 hover:bg-zinc-800/60 hover:border-zinc-700 p-3 transition-all"
+          >
+            <div className="flex items-start justify-between gap-2 mb-1.5">
+              <span className="text-xs font-semibold text-zinc-200 leading-snug group-hover:text-white transition-colors">
+                {tpl.name}
+              </span>
+              <ArrowRight className="h-3 w-3 text-zinc-600 group-hover:text-neon-400 shrink-0 mt-0.5 transition-colors" />
+            </div>
+            <p className="text-[11px] text-zinc-500 leading-relaxed mb-2">{tpl.description}</p>
+            <div className="flex items-center gap-1.5">
+              <span className={`text-[10px] font-medium ${tpl.categoryColor}`}>{tpl.category}</span>
+              <span className="text-zinc-700">·</span>
+              <span className="text-[10px] font-mono text-zinc-600">{tpl.trigger.event}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function getSourceStyle(source: string): string {
   const map: Record<string, string> = {
     page_tools:          "text-zinc-400 bg-zinc-800/40",
@@ -125,6 +471,7 @@ function Section({
   count,
   actionLabel,
   onAction,
+  secondaryAction,
   children,
 }: {
   icon: React.ReactNode;
@@ -133,6 +480,7 @@ function Section({
   count?: number;
   actionLabel?: string;
   onAction?: () => void;
+  secondaryAction?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -151,15 +499,18 @@ function Section({
             )}
           </div>
         </div>
-        {actionLabel && onAction && (
-          <button
-            onClick={onAction}
-            className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 px-3 py-1.5 rounded-lg hover:bg-zinc-800 transition-colors"
-          >
-            <Plus className="h-3 w-3" />
-            {actionLabel}
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {secondaryAction}
+          {actionLabel && onAction && (
+            <button
+              onClick={onAction}
+              className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 px-3 py-1.5 rounded-lg hover:bg-zinc-800 transition-colors"
+            >
+              <Plus className="h-3 w-3" />
+              {actionLabel}
+            </button>
+          )}
+        </div>
       </div>
       <div className="p-4">{children}</div>
     </section>
@@ -1672,6 +2023,8 @@ export function WorkflowPage({ tab }: { tab: Doc<"sidebarTabs"> }) {
   const [activeTab, setActiveTab] = useState<WorkflowTab>("workflow");
   const [showAutoForm, setShowAutoForm] = useState(false);
   const [showSchedForm, setShowSchedForm] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templateInitial, setTemplateInitial] = useState<WorkflowTemplate | null>(null);
   const [editingAutoId, setEditingAutoId] = useState<string | null>(null);
   const [editingSchedId, setEditingSchedId] = useState<string | null>(null);
   const [eventLimit, setEventLimit] = useState(50);
@@ -1747,17 +2100,55 @@ export function WorkflowPage({ tab }: { tab: Doc<"sidebarTabs"> }) {
             actionLabel="New"
             onAction={() => {
               setShowAutoForm(true);
+              setShowTemplates(false);
+              setTemplateInitial(null);
               setShowSchedForm(false);
             }}
+            secondaryAction={
+              !showAutoForm && !showTemplates ? (
+                <button
+                  onClick={() => {
+                    setShowTemplates(true);
+                    setShowAutoForm(false);
+                    setTemplateInitial(null);
+                  }}
+                  className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-neon-400 transition-colors"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  Templates
+                </button>
+              ) : undefined
+            }
           >
+            {showTemplates && !showAutoForm && (
+              <TemplatesPicker
+                onSelect={(tpl) => {
+                  setTemplateInitial(tpl);
+                  setShowTemplates(false);
+                  setShowAutoForm(true);
+                }}
+                onClose={() => setShowTemplates(false)}
+              />
+            )}
+
             {showAutoForm && (
               <AutomationForm
                 agentId={agentId as string}
+                initialData={templateInitial ? {
+                  name: templateInitial.name,
+                  description: templateInitial.description,
+                  trigger: templateInitial.trigger,
+                  actions: templateInitial.actions,
+                } : undefined}
                 onCreate={async (data) => {
                   await createAutomation(data);
                   setShowAutoForm(false);
+                  setTemplateInitial(null);
                 }}
-                onCancel={() => setShowAutoForm(false)}
+                onCancel={() => {
+                  setShowAutoForm(false);
+                  setTemplateInitial(null);
+                }}
               />
             )}
 
@@ -1767,19 +2158,27 @@ export function WorkflowPage({ tab }: { tab: Doc<"sidebarTabs"> }) {
                   <div key={i} className="h-16 rounded-xl bg-zinc-800/20 animate-pulse" />
                 ))}
               </div>
-            ) : automations.length === 0 && !showAutoForm ? (
+            ) : automations.length === 0 && !showAutoForm && !showTemplates ? (
               <div className="text-center py-8">
                 <Zap className="h-8 w-8 text-zinc-800 mx-auto mb-2" />
                 <p className="text-xs text-zinc-500 font-medium">No automations yet</p>
                 <p className="text-[11px] text-zinc-600 mt-0.5">
                   Create event-triggered pipelines
                 </p>
-                <button
-                  onClick={() => setShowAutoForm(true)}
-                  className="mt-3 flex items-center gap-1.5 rounded-xl bg-zinc-800 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-700 transition-colors mx-auto"
-                >
-                  <Plus className="h-3.5 w-3.5" /> Create Automation
-                </button>
+                <div className="mt-3 flex items-center gap-2 justify-center">
+                  <button
+                    onClick={() => { setShowAutoForm(true); setTemplateInitial(null); }}
+                    className="flex items-center gap-1.5 rounded-xl bg-zinc-800 px-3 py-2 text-xs font-medium text-zinc-300 hover:bg-zinc-700 transition-colors"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Create Automation
+                  </button>
+                  <button
+                    onClick={() => setShowTemplates(true)}
+                    className="flex items-center gap-1.5 rounded-xl bg-neon-950/40 border border-neon-800/30 px-3 py-2 text-xs font-medium text-neon-400 hover:bg-neon-950/60 transition-colors"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" /> From Template
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="space-y-2">
