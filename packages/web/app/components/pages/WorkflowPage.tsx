@@ -386,14 +386,15 @@ function TemplatesPicker({
 }) {
   const [activeCategory, setActiveCategory] = useState("All");
   const [search, setSearch] = useState("");
+  const [showAllTags, setShowAllTags] = useState(false);
   const allCategories = ["All", ...TEMPLATE_CATEGORIES];
-  // Show max 5 tags (All + 4 categories); rest hidden unless selected
   const visibleCategories = allCategories.slice(0, 5);
   const hiddenCategories = allCategories.slice(5);
-  const shownCategories =
-    hiddenCategories.includes(activeCategory)
-      ? [...visibleCategories, activeCategory]
-      : visibleCategories;
+  const shownCategories = showAllTags
+    ? allCategories
+    : hiddenCategories.includes(activeCategory)
+    ? [...visibleCategories, activeCategory]
+    : visibleCategories;
 
   const filtered = WORKFLOW_TEMPLATES.filter((t) => {
     const matchesCategory = activeCategory === "All" || t.category === activeCategory;
@@ -465,6 +466,22 @@ function TemplatesPicker({
               {cat}
             </button>
           ))}
+          {!showAllTags && hiddenCategories.length > 0 && (
+            <button
+              onClick={() => setShowAllTags(true)}
+              className="px-3 py-1 rounded-lg text-xs font-medium text-zinc-600 hover:text-zinc-400 hover:bg-zinc-800/60 transition-colors"
+            >
+              +{hiddenCategories.length} more
+            </button>
+          )}
+          {showAllTags && (
+            <button
+              onClick={() => setShowAllTags(false)}
+              className="px-3 py-1 rounded-lg text-xs font-medium text-zinc-600 hover:text-zinc-400 hover:bg-zinc-800/60 transition-colors"
+            >
+              Show less
+            </button>
+          )}
         </div>
 
         {/* Template grid — scrollable */}
