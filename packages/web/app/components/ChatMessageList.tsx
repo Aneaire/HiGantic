@@ -1,13 +1,17 @@
 import { useEffect, useRef, useCallback } from "react";
 import { ChatMessage } from "./ChatMessage";
-import type { Doc } from "@agent-maker/shared/convex/_generated/dataModel";
+import type { Doc, Id } from "@agent-maker/shared/convex/_generated/dataModel";
 
 export function ChatMessageList({
   messages,
   onSendSuggestion,
+  agentId,
+  configuredImageGenProviders,
 }: {
   messages: Doc<"messages">[];
   onSendSuggestion?: (content: string) => void;
+  agentId?: Id<"agents">;
+  configuredImageGenProviders?: string[];
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -69,6 +73,8 @@ export function ChatMessageList({
             message={msg}
             showSuggestions={msg._id === showSuggestionsFor}
             onSendSuggestion={onSendSuggestion}
+            agentId={agentId}
+            configuredImageGenProviders={configuredImageGenProviders}
           />
         ))}
         <div ref={bottomRef} />

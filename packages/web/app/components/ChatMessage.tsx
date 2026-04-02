@@ -29,6 +29,7 @@ import remarkGfm from "remark-gfm";
 import { useQuery } from "convex/react";
 import { api } from "@agent-maker/shared/convex/_generated/api";
 import type { Doc, Id } from "@agent-maker/shared/convex/_generated/dataModel";
+import { ImageGenReviewPanel } from "./ImageGenReviewPanel";
 
 // ── Copy button (hover-reveal) ──────────────────────────────────────────
 
@@ -250,6 +251,32 @@ function parseImageAsset(tc: { name: string; output?: string }): { assetId: stri
     const nameMatch = tc.output.match(/Image "([^"]+)"/);
     return { assetId: match[1].trim(), name: nameMatch?.[1] };
   }
+
+  return null;
+}
+
+/** Extract pending_approval data from a generate_image tool output */
+function parsePendingApproval(tc: { name: string; output?: string }): {
+  prompt: string;
+  name: string;
+  model?: string;
+  inputAssetId?: string;
+} | null {
+  if (!tc.output) return null;
+  const toolName = tc.name.replace(/^mcp__[^_]+__/, "");
+  if (toolName !== "generate_image") return null;
+
+  try {
+    const parsed = JSON.parse(tc.output);
+    if (parsed.status === "pending_approval" && parsed.prompt) {
+      return {
+        prompt: parsed.prompt,
+        name: parsed.name || "Generated Image",
+        model: parsed.model,
+        inputAssetId: parsed.input_asset_id,
+      };
+    }
+  } catch {}
 
   return null;
 }
@@ -767,10 +794,14 @@ export function ChatMessage({
   message,
   showSuggestions,
   onSendSuggestion,
+  agentId,
+  configuredImageGenProviders,
 }: {
   message: Doc<"messages">;
   showSuggestions?: boolean;
   onSendSuggestion?: (content: string) => void;
+  agentId?: Id<"agents">;
+  configuredImageGenProviders?: string[];
 }) {
   const isUser = message.role === "user";
   const isStreaming = message.status === "processing";
@@ -842,12 +873,29 @@ export function ChatMessage({
           />
         )}
 
-        {/* Inline generated images — preview while generating, actual image when done */}
+        {/* Inline generated images — review panel, preview while generating, or actual image when done */}
         {visibleToolCalls?.map((tc) => {
           // Show completed image
           const img = parseImageAsset(tc);
           if (img) {
             return <InlineAssetImage key={tc.id} assetId={img.assetId} name={img.name} />;
+          }
+          // Show review panel for pending approval
+          const pending = parsePendingApproval(tc);
+          if (pending && agentId) {
+            return (
+              <ImageGenReviewPanel
+                key={tc.id}
+                messageId={message._id}
+                toolCallId={tc.id}
+                agentId={agentId}
+                initialPrompt={pending.prompt}
+                initialName={pending.name}
+                initialModel={pending.model}
+                inputAssetId={pending.inputAssetId}
+                configuredImageGenProviders={configuredImageGenProviders}
+              />
+            );
           }
           // Show preview placeholder while generating
           if (!tc.output && isStreaming) {

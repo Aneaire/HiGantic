@@ -112,7 +112,7 @@ export default function ChatPage() {
       </div>
 
       {/* Messages */}
-      <ChatMessageList messages={messages} onSendSuggestion={handleSend} />
+      <ChatMessageList messages={messages} onSendSuggestion={handleSend} agentId={agent._id} configuredImageGenProviders={configuredImageGenProviders} />
 
       {/* Input */}
       <ChatInput
@@ -121,10 +121,8 @@ export default function ChatPage() {
         isProcessing={hasActiveRun}
         model={agent.model}
         onModelChange={(model) => updateAgent({ agentId: agent._id, model })}
-        imageGenModel={(agent.enabledToolSets ?? []).includes("image_generation") && configuredImageGenProviders.length > 0 ? (agent.imageGenModel || "gemini:imagen-4.0-generate-001") : undefined}
-        onImageGenModelChange={(agent.enabledToolSets ?? []).includes("image_generation") && configuredImageGenProviders.length > 0 ? (imageGenModel) => updateAgent({ agentId: agent._id, imageGenModel }) : undefined}
-        configuredImageGenProviders={configuredImageGenProviders}
         enabledModels={agent.enabledModels}
+        agentId={agent._id}
       />
     </div>
   );
