@@ -111,7 +111,7 @@ export const CREDENTIAL_TYPE_REGISTRY: Record<string, CredentialTypeDef> = {
         type: "password",
         placeholder: "MTk...",
         required: true,
-        helpText: "From your Discord app's Bot page at discord.com/developers/applications",
+        helpText: "Create an app at discord.com/developers/applications → Bot → Reset Token. Enable Message Content Intent for reading messages. Invite the bot to your server via OAuth2 → URL Generator.",
       },
     ],
     compatibleToolSets: ["discord"],
