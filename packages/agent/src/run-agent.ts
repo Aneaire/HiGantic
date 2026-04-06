@@ -239,8 +239,24 @@ export async function runAgent(params: RunAgentParams) {
     const gmailConfig = configs.gmail ?? null;
     const imageGenConfig = configs.image_generation ?? null;
 
+    // Check if this conversation is Discord-sourced (needed early for history filtering)
+    const discordSource = await convexClient.getDiscordSourceForConversation(params.conversationId);
+    const isDiscordBot = discordSource?.mode === "bot";
+    const isDiscordAgent = discordSource?.mode === "agent";
+    const isDiscord = isDiscordBot || isDiscordAgent;
+
+    // For Discord conversations, limit history to last 24 hours for context window optimization
+    let effectiveMessages = allMessages;
+    let olderMessageCount = 0;
+    if (isDiscord) {
+      const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
+      const recent = allMessages.filter((m: any) => m._creationTime >= twentyFourHoursAgo);
+      olderMessageCount = allMessages.length - recent.length;
+      effectiveMessages = recent;
+    }
+
     // Build conversation messages (exclude the placeholder assistant message)
-    const apiMessages = allMessages
+    const apiMessages = effectiveMessages
       .filter(
         (m: any) =>
           m._id !== params.assistantMessageId && m.content?.trim()
@@ -251,7 +267,7 @@ export async function runAgent(params: RunAgentParams) {
       }));
 
     // Extract the latest user message as the prompt
-    const latestUserMsg = [...allMessages]
+    const latestUserMsg = [...effectiveMessages]
       .filter((m: any) => m._id !== params.assistantMessageId)
       .reverse()
       .find((m: any) => m.role === "user");
@@ -312,20 +328,21 @@ export async function runAgent(params: RunAgentParams) {
         ? `\n\n## Conversation History\n${historyMessages.map((m) => `<${m.role}>\n${m.content}\n</${m.role}>`).join("\n\n")}\n`
         : "";
 
-    // Check if this conversation is Discord-sourced and get the mode
-    const discordSource = await convexClient.getDiscordSourceForConversation(params.conversationId);
-    const isDiscordBot = discordSource?.mode === "bot";
-    const isDiscordAgent = discordSource?.mode === "agent";
+    // Note about older messages beyond 24h window (Discord only)
+    const olderHistoryNote = olderMessageCount > 0
+      ? `\n\n> Note: ${olderMessageCount} older messages exist beyond the 24-hour context window. Use the recall_channel_history tool to access them if needed.`
+      : "";
 
     // Build system prompt with full context
     let systemPrompt: string;
 
     if (isDiscordBot && (agent as any).discordBotPrompt) {
-      // Bot mode: use the custom Discord bot prompt directly
-      systemPrompt = `${(agent as any).discordBotPrompt}
+      // Bot mode: use the custom Discord bot prompt + conversation history
+      systemPrompt = `${(agent as any).discordBotPrompt}${conversationHistory}${olderHistoryNote}
 
 ## Context
-You are responding in a Discord channel. Keep responses concise and use Discord markdown where appropriate.`;
+You are responding in a Discord channel. Keep responses concise and use Discord markdown where appropriate.
+You have conversation history from this channel above. Reference it naturally when the user asks about previous messages.`;
     } else {
       // Normal agent mode (including Discord agent mode)
       const basePrompt = buildSystemPrompt(
@@ -345,10 +362,11 @@ You are responding in a Discord channel. Keep responses concise and use Discord 
       );
 
       if (isDiscordAgent) {
-        systemPrompt = `${basePrompt}
+        systemPrompt = `${basePrompt}${olderHistoryNote}
 
 ## Discord Channel Context
-You are responding to a message in a Discord channel. Keep responses concise. Use Discord markdown (bold, code blocks, etc.) for formatting. Avoid overly long responses.`;
+You are responding to a message in a Discord channel. Keep responses concise. Use Discord markdown (bold, code blocks, etc.) for formatting.
+You have conversation history from this channel. Reference it naturally when the user asks about previous messages.`;
       } else {
         systemPrompt = basePrompt;
       }
@@ -385,6 +403,7 @@ You are responding to a message in a Discord channel. Keep responses concise. Us
       imageGenConfig: imageGenConfig as any,
       imageGenModel: agent.imageGenModel,
       onToolProgress,
+      isDiscordConversation: isDiscord,
     });
 
     const allowedTools = buildAllowedTools(
