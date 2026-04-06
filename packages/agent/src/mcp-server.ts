@@ -1,4 +1,5 @@
-import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
+import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
+import { z } from "zod";
 import type { AgentConvexClient } from "./convex-client.js";
 import { createMemoryTools } from "./tools/memory-tools.js";
 import { createPageTools, getPageToolNames } from "./tools/page-tools.js";
@@ -105,6 +106,7 @@ interface McpServerDeps {
   imageGenModel?: string | null;
   gmailConfig?: GmailConfig | null;
   onToolProgress?: (toolName: string, progress: string) => void;
+  isDiscordConversation?: boolean;
 }
 
 function has(enabledToolSets: string[], name: string): boolean {
@@ -200,6 +202,37 @@ export function buildMcpServer(deps: McpServerDeps) {
   if (has(enabled, "discord") && deps.discordConfig) {
     tools.push(
       ...createDiscordTools(deps.convexClient, deps.agentId, deps.discordConfig)
+    );
+  }
+
+  // Discord channel history recall — available when conversation is Discord-sourced
+  if (deps.isDiscordConversation && deps.conversationId) {
+    const convexClient = deps.convexClient;
+    const conversationId = deps.conversationId;
+    tools.push(
+      tool(
+        "recall_channel_history",
+        "Load older messages from this Discord channel beyond the 24-hour context window. Use this when the user references something from a previous day or you need deeper conversation history.",
+        {
+          hours_ago: z.number().default(48).describe("How many hours back to look (from now). Default 48."),
+          limit: z.number().default(50).describe("Max number of messages to retrieve. Default 50."),
+        },
+        async (input) => {
+          const beforeTimestamp = Date.now() - (input.hours_ago * 60 * 60 * 1000);
+          const messages = await convexClient.listOlderMessages(conversationId, beforeTimestamp, input.limit);
+          if (!messages || messages.length === 0) {
+            return {
+              content: [{ type: "text" as const, text: "No older messages found in this time range." }],
+            };
+          }
+          const formatted = messages.map((m: any) =>
+            `[${new Date(m._creationTime).toLocaleString()}] ${m.role}: ${m.content?.slice(0, 500) ?? "(empty)"}`
+          ).join("\n\n");
+          return {
+            content: [{ type: "text" as const, text: `Found ${messages.length} older messages:\n\n${formatted}` }],
+          };
+        }
+      )
     );
   }
 
@@ -384,7 +417,8 @@ export function buildAllowedTools(
       "mcp__agent-tools__discord_read_messages",
       "mcp__agent-tools__discord_add_reaction",
       "mcp__agent-tools__discord_create_thread",
-      "mcp__agent-tools__discord_reply_in_thread"
+      "mcp__agent-tools__discord_reply_in_thread",
+      "mcp__agent-tools__recall_channel_history"
     );
   }
 
