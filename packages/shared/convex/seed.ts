@@ -1273,6 +1273,49 @@ export const listAllSlackBots = internalQuery({
 });
 
 /**
+ * Get the most recent assistant message in any slack conversation for the
+ * sandbox agent — used to debug bot mode errors.
+ */
+export const lastSlackAssistantMessage = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const agent = await ctx.db
+      .query("agents")
+      .withIndex("by_slug", (q: any) => q.eq("slug", SANDBOX_SLUG))
+      .first();
+    if (!agent) return null;
+
+    const maps = await ctx.db
+      .query("slackConversationMap")
+      .withIndex("by_agent_channel", (q: any) => q.eq("agentId", agent._id))
+      .collect();
+
+    const all: any[] = [];
+    for (const m of maps) {
+      const msgs = await ctx.db
+        .query("messages")
+        .withIndex("by_conversation", (q: any) => q.eq("conversationId", m.conversationId))
+        .order("desc")
+        .take(3);
+      for (const msg of msgs) {
+        all.push({
+          channelId: m.slackChannelId,
+          channelType: m.channelType,
+          mode: m.mode,
+          mentioner: m.lastMentionerUserId,
+          role: msg.role,
+          status: msg.status,
+          content: msg.content?.slice(0, 500),
+          error: (msg as any).error,
+          createdAt: new Date(msg._creationTime).toISOString(),
+        });
+      }
+    }
+    return all.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 6);
+  },
+});
+
+/**
  * Programmatically enable Slack bot on the sandbox agent (skips needing the UI).
  * Adds aneaire010 + kiko as authorized users.
  */

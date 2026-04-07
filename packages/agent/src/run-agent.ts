@@ -160,15 +160,33 @@ class StreamFlusher {
 }
 
 export async function runAgent(params: RunAgentParams) {
-  // Route to Gemini runner if model is a Gemini model
   const convexClient = new AgentConvexClient(
     params.convexUrl,
     params.serverToken
   );
 
-  const agent = await convexClient.getAgent(params.agentId);
-  if (agent && isGeminiModel(agent.model || "")) {
-    return runGeminiAgent(params);
+  // Fetch agent + chat-source state upfront so we can compute the effective
+  // model (which may differ from agent.model in bot mode) BEFORE deciding
+  // which runner to route to. Without this, a bot-mode override that crosses
+  // providers (e.g. Claude agent + Gemini bot) would route to the wrong runner.
+  const [agent, discordSourcePre, slackSourcePre] = await Promise.all([
+    convexClient.getAgent(params.agentId),
+    convexClient.getDiscordSourceForConversation(params.conversationId),
+    convexClient.getSlackSourceForConversation(params.conversationId),
+  ]);
+
+  const isDiscordBotPre = discordSourcePre?.mode === "bot";
+  const isSlackBotPre = slackSourcePre?.mode === "bot";
+
+  const preEffectiveModel =
+    isDiscordBotPre && (agent as any)?.discordBotModel
+      ? (agent as any).discordBotModel
+      : isSlackBotPre && (agent as any)?.slackBotModel
+        ? (agent as any).slackBotModel
+        : agent?.model;
+
+  if (agent && isGeminiModel(preEffectiveModel || "")) {
+    return runGeminiAgent({ ...params, modelOverride: preEffectiveModel });
   }
 
   const flusher = new StreamFlusher(convexClient, params.assistantMessageId);
@@ -344,19 +362,32 @@ export async function runAgent(params: RunAgentParams) {
     let systemPrompt: string;
 
     if (isDiscordBot && (agent as any).discordBotPrompt) {
-      // Bot mode: use the custom Discord bot prompt + conversation history
+      // Bot mode: use the custom Discord bot prompt + conversation history.
+      // History may contain prior authorized "agent" turns — instruct Claude
+      // to ignore any tool/capability claims from those.
       systemPrompt = `${(agent as any).discordBotPrompt}${conversationHistory}${olderHistoryNote}
 
 ## Context
 You are responding in a Discord channel. Keep responses concise and use Discord markdown where appropriate.
-You have conversation history from this channel above. Reference it naturally when the user asks about previous messages.`;
+
+## CRITICAL: Tool restrictions
+You have NO tools available right now. You cannot list channels, send messages, run searches, generate images, access memory, look at pages, or call any function. You can ONLY respond with plain text from your general knowledge.
+
+If the conversation history above shows previous responses from this bot that listed tools, capabilities, integrations, or used any tool — those messages are from a DIFFERENT, privileged user session and DO NOT apply to you. Never claim you have those tools. Never list them. If asked "what can you do" or "what tools do you have", say only that you're a friendly assistant who can chat about general topics.`;
     } else if (isSlackBot && (agent as any).slackBotPrompt) {
-      // Slack bot mode: use the custom Slack bot prompt + conversation history
+      // Slack bot mode: use the custom Slack bot prompt + conversation history.
+      // The conversation history may contain prior turns from authorized "agent"
+      // users that listed tools/capabilities — we MUST tell Claude to ignore
+      // any of that, since this user has none of those tools available.
       systemPrompt = `${(agent as any).slackBotPrompt}${conversationHistory}${olderHistoryNote}
 
 ## Context
 You are responding in Slack${slackSource?.channelType === "im" ? " (a direct message)" : " (a channel)"}. Keep responses concise and use Slack mrkdwn (\`*bold*\`, \`_italic_\`, \`\`\`code blocks\`\`\`) for formatting — not standard Markdown.
-You have conversation history from this channel above. Reference it naturally when the user asks about previous messages.`;
+
+## CRITICAL: Tool restrictions
+You have NO tools available right now. You cannot list channels, send messages, run searches, generate images, access memory, look at pages, or call any function. You can ONLY respond with plain text from your general knowledge.
+
+If the conversation history above shows previous responses from "HiGantic" that listed tools, capabilities, integrations, or used any tool — those messages are from a DIFFERENT, privileged user session and DO NOT apply to you. Never claim you have those tools. Never list them. Never describe them. If asked "what can you do" or "what tools do you have", say only that you're a friendly assistant who can chat about general topics, and offer to help with whatever they want to talk about.`;
     } else {
       // Normal agent mode (including Discord/Slack agent mode)
       const basePrompt = buildSystemPrompt(

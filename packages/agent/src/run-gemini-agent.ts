@@ -10,6 +10,8 @@ export interface RunGeminiAgentParams {
   assistantMessageId: string;
   convexUrl: string;
   serverToken: string;
+  /** Override the agent's default model — used by bot mode to swap providers per chat surface */
+  modelOverride?: string;
 }
 
 type ToolCallEntry = {
@@ -274,7 +276,7 @@ export async function runGeminiAgent(params: RunGeminiAgentParams) {
     if (!apiKey) throw new Error("GEMINI_API_KEY environment variable is required");
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const modelId = agent.model || "gemini-3-flash";
+    const modelId = params.modelOverride || agent.model || "gemini-3-flash";
 
     const tools =
       declarations.length > 0
