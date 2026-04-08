@@ -1273,6 +1273,57 @@ export const listAllSlackBots = internalQuery({
 });
 
 /**
+ * Patch sandbox agent's bot models to sane defaults so tests don't hit
+ * invalid model IDs. Also clears any stuck `processing` assistant messages.
+ */
+export const fixSandboxModels = internalMutation({
+  handler: async (ctx) => {
+    const agent = await ctx.db
+      .query("agents")
+      .withIndex("by_slug", (q: any) => q.eq("slug", SANDBOX_SLUG))
+      .first();
+    if (!agent) return { error: "sandbox agent not found" };
+
+    await ctx.db.patch(agent._id, {
+      slackBotModel: "claude-haiku-4-5-20251001",
+      discordBotModel: "claude-haiku-4-5-20251001",
+    } as any);
+
+    // Clear stuck processing assistant messages older than 60s so Slack polls
+    // don't hang on past jobs.
+    const now = Date.now();
+    const convs = await ctx.db
+      .query("conversations")
+      .withIndex("by_agent", (q: any) => q.eq("agentId", agent._id))
+      .collect();
+    let cleared = 0;
+    for (const conv of convs) {
+      const msgs = await ctx.db
+        .query("messages")
+        .withIndex("by_conversation_status", (q: any) =>
+          q.eq("conversationId", conv._id).eq("status", "processing")
+        )
+        .collect();
+      for (const m of msgs) {
+        if (now - m._creationTime > 60_000) {
+          await ctx.db.patch(m._id, {
+            status: "error",
+            error: "Job timed out / abandoned by previous run",
+          });
+          cleared++;
+        }
+      }
+    }
+    return {
+      patched: true,
+      clearedStuckMessages: cleared,
+      agentModel: (agent as any).model,
+      slackBotModelBefore: (agent as any).slackBotModel,
+    };
+  },
+});
+
+/**
  * Get the most recent assistant message in any slack conversation for the
  * sandbox agent — used to debug bot mode errors.
  */
@@ -1292,26 +1343,32 @@ export const lastSlackAssistantMessage = internalQuery({
 
     const all: any[] = [];
     for (const m of maps) {
+      const conv = (await ctx.db.get(m.conversationId)) as any;
       const msgs = await ctx.db
         .query("messages")
         .withIndex("by_conversation", (q: any) => q.eq("conversationId", m.conversationId))
         .order("desc")
-        .take(3);
+        .take(4);
       for (const msg of msgs) {
         all.push({
           channelId: m.slackChannelId,
+          channelName: (m as any).slackChannelName ?? null,
+          threadTs: (m as any).slackThreadTs ?? null,
           channelType: m.channelType,
           mode: m.mode,
-          mentioner: m.lastMentionerUserId,
+          mentionerId: m.lastMentionerUserId,
+          mentionerName: (m as any).lastMentionerUserName ?? null,
+          convTitle: conv?.title ?? null,
           role: msg.role,
+          senderName: (msg as any).senderName ?? null,
           status: msg.status,
-          content: msg.content?.slice(0, 500),
+          content: msg.content?.slice(0, 300),
           error: (msg as any).error,
           createdAt: new Date(msg._creationTime).toISOString(),
         });
       }
     }
-    return all.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 6);
+    return all.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12);
   },
 });
 
