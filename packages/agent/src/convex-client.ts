@@ -733,25 +733,39 @@ export class AgentConvexClient {
     slackChannelId: string,
     channelType: "channel" | "im",
     mode: "agent" | "bot",
-    mentionerUserId?: string
+    mentionerUserId?: string,
+    opts?: {
+      slackThreadTs?: string;
+      mentionerUserName?: string;
+      slackChannelName?: string;
+    }
   ) {
     return this.client.mutation(api.agentApi.getOrCreateSlackConversation, {
       serverToken: this.serverToken,
       agentId: agentId as any,
       slackTeamId,
       slackChannelId,
+      slackChannelName: opts?.slackChannelName,
+      slackThreadTs: opts?.slackThreadTs,
       channelType,
       mode,
       mentionerUserId,
+      mentionerUserName: opts?.mentionerUserName,
     });
   }
 
-  async createSlackJob(agentId: string, conversationId: string, userContent: string) {
+  async createSlackJob(
+    agentId: string,
+    conversationId: string,
+    userContent: string,
+    senderName?: string
+  ) {
     return this.client.mutation(api.agentApi.createSlackJob, {
       serverToken: this.serverToken,
       agentId: agentId as any,
       conversationId: conversationId as any,
       userContent,
+      senderName,
     });
   }
 

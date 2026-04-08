@@ -257,6 +257,7 @@ export default defineSchema({
         })
       )
     ),
+    senderName: v.optional(v.string()),
   })
     .index("by_conversation", ["conversationId"])
     .index("by_conversation_status", ["conversationId", "status"]),
@@ -658,12 +659,17 @@ export default defineSchema({
     agentId: v.id("agents"),
     slackTeamId: v.string(),
     slackChannelId: v.string(),
+    slackChannelName: v.optional(v.string()),
+    slackThreadTs: v.optional(v.string()),
     channelType: v.union(v.literal("channel"), v.literal("im")),
     conversationId: v.id("conversations"),
     mode: v.union(v.literal("agent"), v.literal("bot")),
     lastMentionerUserId: v.optional(v.string()),
+    lastMentionerUserName: v.optional(v.string()),
   })
     .index("by_agent_channel", ["agentId", "slackChannelId"])
+    .index("by_agent_channel_thread", ["agentId", "slackChannelId", "slackThreadTs"])
+    .index("by_agent", ["agentId"])
     .index("by_conversation", ["conversationId"]),
 
   slackGatewayState: defineTable({

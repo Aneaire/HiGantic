@@ -6,11 +6,13 @@
 import { AgentConvexClient } from "./convex-client.js";
 import { SlackGateway, type SlackInboundEvent } from "./slack-gateway.js";
 import { sendSlackReply } from "./slack-response-handler.js";
+import { formatBotError } from "./bot-error-format.js";
 
 interface GatewayEntry {
   gateway: SlackGateway;
   botToken: string;
 }
+
 
 export class SlackGatewayManager {
   private gateways = new Map<string, GatewayEntry>();
@@ -118,9 +120,9 @@ export class SlackGatewayManager {
   }
 
   private async handleEvent(agentId: string, botToken: string, event: SlackInboundEvent) {
-    const { teamId, channelId, channelType, userId, text, threadTs } = event;
+    const { teamId, channelId, channelName, channelType, userId, userName, text, threadTs, ts } = event;
     console.log(
-      `[slack-gateway-manager] ${channelType === "im" ? "DM" : "@mention"} in ${channelId} from ${userId}: "${text.slice(0, 80)}"`
+      `[slack-gateway-manager] ${channelType === "im" ? "DM" : "@mention"} in ${channelId} from ${userName ?? userId}: "${text.slice(0, 80)}"`
     );
 
     if (!text) return;
@@ -130,13 +132,24 @@ export class SlackGatewayManager {
       const authorized: string[] = ((freshAgent as any)?.slackAuthorizedUsers ?? []) as string[];
       const mode: "agent" | "bot" = authorized.includes(userId) ? "agent" : "bot";
 
+      // For channel mentions, key the conversation on the Slack thread. If the
+      // mention wasn't already inside a thread, use the message ts — Slack replies
+      // will then thread onto that ts via waitAndRespond's threadTs param.
+      const effectiveThreadTs =
+        channelType === "im" ? undefined : threadTs ?? ts;
+
       const conversationId = await this.convexClient.getOrCreateSlackConversation(
         agentId,
         teamId,
         channelId,
         channelType,
         mode,
-        userId
+        userId,
+        {
+          slackThreadTs: effectiveThreadTs,
+          mentionerUserName: userName,
+          slackChannelName: channelName,
+        }
       );
 
       // Emit inbound event for automations
@@ -145,6 +158,7 @@ export class SlackGatewayManager {
         .emitEvent(agentId, inboundEventName, "slack_gateway", {
           channel: channelId,
           userId,
+          userName,
           text,
           mode,
         })
@@ -153,11 +167,15 @@ export class SlackGatewayManager {
       const { assistantMessageId } = await this.convexClient.createSlackJob(
         agentId,
         conversationId as string,
-        text
+        text,
+        userName
       );
 
-      // Reply in the same thread if the inbound was a thread message; otherwise top-level
-      this.waitAndRespond(botToken, channelId, assistantMessageId as string, threadTs);
+      // Reply in the same thread. For channel mentions we always thread replies
+      // (using effectiveThreadTs), so multiple people in one channel don't pile
+      // into a single flat conversation. DMs stay top-level.
+      const replyThreadTs = channelType === "im" ? threadTs : effectiveThreadTs;
+      this.waitAndRespond(botToken, channelId, assistantMessageId as string, replyThreadTs);
     } catch (err: any) {
       console.error("[slack-gateway-manager] handleEvent error:", err.message);
       await sendSlackReply(botToken, channelId, "⚠️ Something went wrong. Please try again.", threadTs).catch(
@@ -178,7 +196,12 @@ export class SlackGatewayManager {
 
     const poll = async (): Promise<void> => {
       if (Date.now() - startTime > maxWaitMs) {
-        await sendSlackReply(botToken, channelId, "⏱️ Request timed out.", threadTs).catch(() => {});
+        await sendSlackReply(
+          botToken,
+          channelId,
+          "⏱️ *Taking longer than expected.*\nThe model is still thinking — this can happen when the provider is overloaded or the request is complex. If it eventually finishes, you'll see the reply in the Agent Maker dashboard. Try again in a moment.",
+          threadTs
+        ).catch(() => {});
         return;
       }
 
@@ -191,9 +214,8 @@ export class SlackGatewayManager {
         }
 
         if (msg.status === "error") {
-          await sendSlackReply(botToken, channelId, `❌ ${msg.error ?? "An error occurred."}`, threadTs).catch(
-            () => {}
-          );
+          const friendly = formatBotError(msg.error, "Slack");
+          await sendSlackReply(botToken, channelId, friendly, threadTs).catch(() => {});
           return;
         }
 

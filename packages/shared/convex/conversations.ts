@@ -16,6 +16,48 @@ export const list = query({
   },
 });
 
+/**
+ * List Slack-originated conversations for an agent, grouped by channel.
+ * Each entry includes the conversation title, last mentioner name, last activity,
+ * and the slack conversation map metadata (channel, thread, mode).
+ */
+export const listSlackConversationsForAgent = query({
+  args: { agentId: v.id("agents") },
+  handler: async (ctx, args) => {
+    const user = await requireAuthUser(ctx);
+    const agent = await ctx.db.get(args.agentId);
+    if (!agent || agent.userId !== user._id) return [];
+
+    const maps = await ctx.db
+      .query("slackConversationMap")
+      .withIndex("by_agent", (q) => q.eq("agentId", args.agentId))
+      .collect();
+
+    const enriched = await Promise.all(
+      maps.map(async (m) => {
+        const conv = await ctx.db.get(m.conversationId);
+        return {
+          _id: m._id,
+          conversationId: m.conversationId,
+          slackChannelId: m.slackChannelId,
+          slackChannelName: m.slackChannelName,
+          slackThreadTs: m.slackThreadTs,
+          channelType: m.channelType,
+          mode: m.mode,
+          lastMentionerUserId: m.lastMentionerUserId,
+          lastMentionerUserName: m.lastMentionerUserName,
+          title: conv?.title ?? null,
+          lastActivity: conv?._creationTime ?? m._creationTime,
+        };
+      })
+    );
+
+    return enriched
+      .filter((e) => e.title !== null)
+      .sort((a, b) => b.lastActivity - a.lastActivity);
+  },
+});
+
 export const get = query({
   args: { conversationId: v.id("conversations") },
   handler: async (ctx, args) => {

@@ -270,6 +270,22 @@ export async function runAgent(params: RunAgentParams) {
     const isSlack = isSlackBot || isSlackAgent;
     const isExternalChat = isDiscord || isSlack;
 
+    // Build a "who sent this message" block for Slack so the agent can address
+    // the requester by name. Uses the last mentioner recorded on the slack
+    // conversation map, which is updated on every inbound event.
+    const slackRequesterBlock = (() => {
+      if (!isSlack) return "";
+      const name = (slackSource as any)?.lastMentionerUserName as string | undefined;
+      const uid = (slackSource as any)?.lastMentionerUserId as string | undefined;
+      if (!name && !uid) return "";
+      const display = name ?? uid;
+      return `
+
+## Requester
+The current message is from Slack user **${display}**${name && uid ? ` (<@${uid}>)` : ""}.
+Address them by name when it feels natural — especially in greetings, confirmations, or when multiple people may be in the channel. Don't force it into every sentence.`;
+    })();
+
     // For Discord/Slack conversations, limit history to last 24 hours for context window optimization
     let effectiveMessages = allMessages;
     let olderMessageCount = 0;
@@ -387,7 +403,7 @@ You are responding in Slack${slackSource?.channelType === "im" ? " (a direct mes
 ## CRITICAL: Tool restrictions
 You have NO tools available right now. You cannot list channels, send messages, run searches, generate images, access memory, look at pages, or call any function. You can ONLY respond with plain text from your general knowledge.
 
-If the conversation history above shows previous responses from "HiGantic" that listed tools, capabilities, integrations, or used any tool — those messages are from a DIFFERENT, privileged user session and DO NOT apply to you. Never claim you have those tools. Never list them. Never describe them. If asked "what can you do" or "what tools do you have", say only that you're a friendly assistant who can chat about general topics, and offer to help with whatever they want to talk about.`;
+If the conversation history above shows previous responses from "HiGantic" that listed tools, capabilities, integrations, or used any tool — those messages are from a DIFFERENT, privileged user session and DO NOT apply to you. Never claim you have those tools. Never list them. Never describe them. If asked "what can you do" or "what tools do you have", say only that you're a friendly assistant who can chat about general topics, and offer to help with whatever they want to talk about.${slackRequesterBlock}`;
     } else {
       // Normal agent mode (including Discord/Slack agent mode)
       const basePrompt = buildSystemPrompt(
@@ -417,7 +433,7 @@ You have conversation history from this channel. Reference it naturally when the
 
 ## Slack ${slackSource?.channelType === "im" ? "DM" : "Channel"} Context
 You are responding to a message in Slack. Keep responses concise. Use Slack mrkdwn (\`*bold*\`, \`_italic_\`, \`\`\`code blocks\`\`\`) — not standard Markdown.
-You have conversation history from this channel. Reference it naturally when the user asks about previous messages.`;
+You have conversation history from this channel. Reference it naturally when the user asks about previous messages.${slackRequesterBlock}`;
       } else {
         systemPrompt = basePrompt;
       }

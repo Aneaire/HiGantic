@@ -12,8 +12,10 @@ const SLACK_API = "https://slack.com/api";
 export interface SlackInboundEvent {
   teamId: string;
   channelId: string;
+  channelName?: string;
   channelType: "channel" | "im";
   userId: string;
+  userName?: string;
   text: string;
   ts: string;
   threadTs?: string;
@@ -34,6 +36,11 @@ export class SlackGateway {
   private reconnectDelay = 1000;
   private destroyed = false;
   private botUserId: string | null = null;
+  // Cache for Slack user display names keyed by userId. Slack user IDs are globally
+  // unique within a workspace, so we don't need to include teamId here.
+  private userNameCache = new Map<string, string>();
+  // Cache for Slack channel names keyed by channelId.
+  private channelNameCache = new Map<string, string>();
 
   constructor(
     private appToken: string, // xapp-…
@@ -105,6 +112,67 @@ export class SlackGateway {
     return data;
   }
 
+  private async lookupChannelName(channelId: string): Promise<string | undefined> {
+    if (!channelId) return undefined;
+    const cached = this.channelNameCache.get(channelId);
+    if (cached) return cached;
+    try {
+      const res = await fetch(
+        `${SLACK_API}/conversations.info?channel=${encodeURIComponent(channelId)}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.botToken}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+        }
+      );
+      const data: any = await res.json();
+      if (!data.ok) return undefined;
+      const channel = data.channel ?? {};
+      // For IMs, there is no "name" — return undefined so the caller can fall
+      // back to the DM user's display name.
+      const name: string | undefined = channel.name_normalized || channel.name;
+      if (name) this.channelNameCache.set(channelId, name);
+      return name;
+    } catch (err: any) {
+      console.error("[slack-gateway] conversations.info failed:", err.message);
+      return undefined;
+    }
+  }
+
+  private async lookupUserName(userId: string): Promise<string | undefined> {
+    if (!userId) return undefined;
+    const cached = this.userNameCache.get(userId);
+    if (cached) return cached;
+    try {
+      const res = await fetch(
+        `${SLACK_API}/users.info?user=${encodeURIComponent(userId)}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${this.botToken}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+        }
+      );
+      const data: any = await res.json();
+      if (!data.ok) return undefined;
+      const profile = data.user?.profile ?? {};
+      const name: string | undefined =
+        profile.display_name_normalized ||
+        profile.display_name ||
+        profile.real_name_normalized ||
+        profile.real_name ||
+        data.user?.name;
+      if (name) this.userNameCache.set(userId, name);
+      return name;
+    } catch (err: any) {
+      console.error("[slack-gateway] users.info failed:", err.message);
+      return undefined;
+    }
+  }
+
   private scheduleReconnect() {
     const delay = Math.min(this.reconnectDelay, 30000);
     this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30000);
@@ -150,11 +218,15 @@ export class SlackGateway {
     if (type === "events_api") {
       const event = payload.payload?.event;
       const teamId = payload.payload?.team_id ?? "";
-      if (event) this.handleEvent(teamId, event);
+      if (event) {
+        this.handleEvent(teamId, event).catch((err) =>
+          console.error("[slack-gateway] handleEvent error:", err?.message ?? err)
+        );
+      }
     }
   }
 
-  private handleEvent(teamId: string, event: any) {
+  private async handleEvent(teamId: string, event: any) {
     // Filter our own messages and other bots
     if (event.bot_id) return;
     if (this.botUserId && event.user === this.botUserId) return;
@@ -188,6 +260,14 @@ export class SlackGateway {
     }
 
     if (inbound && inbound.text.trim()) {
+      const [userName, channelName] = await Promise.all([
+        this.lookupUserName(inbound.userId),
+        inbound.channelType === "channel"
+          ? this.lookupChannelName(inbound.channelId)
+          : Promise.resolve(undefined),
+      ]);
+      inbound.userName = userName;
+      inbound.channelName = channelName;
       this.callbacks.onMessage(inbound);
     }
   }

@@ -1303,54 +1303,100 @@ export const listSlackEnabledAgents = query({
   },
 });
 
-/** Get or create a Convex conversation for a (agentId, slackChannelId) pair */
+/** Get or create a Convex conversation for a Slack thread.
+ *  Channel mentions key on (agentId, channelId, threadTs) so each thread is its own
+ *  conversation. DMs key on (agentId, channelId) only — there's no thread concept. */
 export const getOrCreateSlackConversation = mutation({
   args: {
     serverToken: v.string(),
     agentId: v.id("agents"),
     slackTeamId: v.string(),
     slackChannelId: v.string(),
+    slackChannelName: v.optional(v.string()),
+    slackThreadTs: v.optional(v.string()),
     channelType: v.union(v.literal("channel"), v.literal("im")),
     mode: v.union(v.literal("agent"), v.literal("bot")),
     mentionerUserId: v.optional(v.string()),
+    mentionerUserName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await requireServerAuth(ctx, args.serverToken);
 
-    const existing = await ctx.db
-      .query("slackConversationMap")
-      .withIndex("by_agent_channel", (q) =>
-        q.eq("agentId", args.agentId).eq("slackChannelId", args.slackChannelId)
-      )
-      .first();
+    // For DMs, match the single conversation for this channel regardless of threadTs.
+    // For channel mentions, match on the specific thread.
+    const isDm = args.channelType === "im";
+    const lookupThreadTs = isDm ? undefined : args.slackThreadTs;
+
+    const existing = isDm
+      ? await ctx.db
+          .query("slackConversationMap")
+          .withIndex("by_agent_channel", (q) =>
+            q.eq("agentId", args.agentId).eq("slackChannelId", args.slackChannelId)
+          )
+          .first()
+      : await ctx.db
+          .query("slackConversationMap")
+          .withIndex("by_agent_channel_thread", (q) =>
+            q
+              .eq("agentId", args.agentId)
+              .eq("slackChannelId", args.slackChannelId)
+              .eq("slackThreadTs", lookupThreadTs)
+          )
+          .first();
 
     if (existing) {
-      const patch: any = { lastMentionerUserId: args.mentionerUserId };
+      const patch: any = {
+        lastMentionerUserId: args.mentionerUserId,
+        lastMentionerUserName: args.mentionerUserName,
+      };
+      if (args.slackChannelName && existing.slackChannelName !== args.slackChannelName) {
+        patch.slackChannelName = args.slackChannelName;
+      }
       if (existing.mode !== args.mode) patch.mode = args.mode;
       await ctx.db.patch(existing._id, patch);
+
+      // Backfill / refresh the conversation title so old rows (which stored the
+      // raw channel ID) show the human-readable channel name in the sidebar.
+      const who = args.mentionerUserName ?? args.mentionerUserId ?? "user";
+      const channelLabel =
+        args.slackChannelName ?? existing.slackChannelName ?? args.slackChannelId;
+      const newTitle = isDm
+        ? `Slack DM · ${who}`
+        : `Slack #${channelLabel} · ${who}`;
+      const conv = await ctx.db.get(existing.conversationId);
+      if (conv && conv.title !== newTitle) {
+        await ctx.db.patch(existing.conversationId, { title: newTitle });
+      }
+
       return existing.conversationId;
     }
 
     const agent = await ctx.db.get(args.agentId);
     if (!agent) throw new Error("Agent not found");
 
+    const who = args.mentionerUserName ?? args.mentionerUserId ?? "user";
+    const channelLabel = args.slackChannelName ?? args.slackChannelId;
+    const title = isDm
+      ? `Slack DM · ${who}`
+      : `Slack #${channelLabel} · ${who}`;
+
     const conversationId = await ctx.db.insert("conversations", {
       agentId: args.agentId,
       userId: agent.userId,
-      title:
-        args.channelType === "im"
-          ? `Slack DM ${args.slackChannelId}`
-          : `Slack #${args.slackChannelId}`,
+      title,
     });
 
     await ctx.db.insert("slackConversationMap", {
       agentId: args.agentId,
       slackTeamId: args.slackTeamId,
       slackChannelId: args.slackChannelId,
+      slackChannelName: args.slackChannelName,
+      slackThreadTs: lookupThreadTs,
       channelType: args.channelType,
       conversationId,
       mode: args.mode,
       lastMentionerUserId: args.mentionerUserId,
+      lastMentionerUserName: args.mentionerUserName,
     });
 
     return conversationId;
@@ -1364,6 +1410,7 @@ export const createSlackJob = mutation({
     agentId: v.id("agents"),
     conversationId: v.id("conversations"),
     userContent: v.string(),
+    senderName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     await requireServerAuth(ctx, args.serverToken);
@@ -1376,6 +1423,7 @@ export const createSlackJob = mutation({
       role: "user",
       content: args.userContent,
       status: "done",
+      senderName: args.senderName,
     });
 
     const assistantMessageId = await ctx.db.insert("messages", {
