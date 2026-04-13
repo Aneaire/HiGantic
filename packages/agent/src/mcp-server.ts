@@ -20,6 +20,7 @@ import { createGDriveTools } from "./tools/gdrive-tools.js";
 import { createGSheetsTools } from "./tools/gsheets-tools.js";
 import { createImageGenTools } from "./tools/image-gen-tools.js";
 import { createGmailTools } from "./tools/gmail-tools.js";
+import { createExploreCapabilitiesTools } from "./tools/explore-capabilities-tools.js";
 
 interface Tab {
   _id: string;
@@ -135,6 +136,9 @@ export function buildMcpServer(deps: McpServerDeps) {
 
   // Suggest replies & questions (always included — core UX, not a capability)
   tools.push(...createSuggestTools(deps.convexClient, deps.messageId));
+
+  // Explore capabilities (always included — lets agent introspect and recommend improvements)
+  tools.push(...createExploreCapabilitiesTools(deps.enabledToolSets));
 
   // RAG / Knowledge Base tools — gated by "rag"
   if (has(enabled, "rag")) {
@@ -319,6 +323,9 @@ export function buildAllowedTools(
     "mcp__agent-tools__suggest_replies",
     "mcp__agent-tools__ask_questions"
   );
+
+  // Explore capabilities (always — self-assessment)
+  allowed.push("mcp__agent-tools__explore_capabilities");
 
   // RAG / Knowledge Base tools — gated by "rag"
   if (has(enabledToolSets, "rag")) {

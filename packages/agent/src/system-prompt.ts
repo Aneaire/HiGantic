@@ -395,26 +395,32 @@ Tell them: *"Go to your agent's Settings page, scroll to Custom HTTP Tools, and 
 `
     : "";
 
-  // ── Available integrations (show what's NOT enabled yet) ────────────
+  // ── Self-assessment / capability exploration ────────────────────────
   const allIntegrations = getAllIntegrationsMap();
+  const disabledCount = Object.keys(allIntegrations).filter(
+    (key) => !has(enabled, key)
+  ).length;
 
-  const disabledIntegrations = Object.entries(allIntegrations)
-    .filter(([key]) => !has(enabled, key))
-    .map(([, info]) => `- **${info.label}** — ${info.description}`);
-
-  const availableIntegrationsSection = disabledIntegrations.length > 0
+  const selfAssessmentSection = disabledCount > 0
     ? `
-## Available Integrations (Not Yet Enabled)
-The following integrations are available but not currently enabled for you. If the user asks about any of these capabilities, let them know it's available and they can enable it:
+## Self-Assessment & Improvement
 
-${disabledIntegrations.join("\n")}
+You have ${enabled.length} capabilities enabled and ${disabledCount} more available. Use your \`explore_capabilities\` tool to:
+- **Discover what's available** — see disabled capabilities grouped by category (core, automation, integration)
+- **Get synergy recommendations** — find which additions pair best with your current setup and why
+- **Assess gaps** — when a user's request hints at a missing capability, check what's available before saying "I can't do that"
 
-To enable these, tell the user: *"This integration is available! You can enable it in the **Settings** page of the HiGantic dashboard under **Tool Sets**."*
-If the user wants more details, point them to the documentation page in the HiGantic dashboard.
+**When to use this tool:**
+- The user asks "what can you do?", "how can we improve?", "what features do you have?"
+- The user describes a workflow that would benefit from a capability you don't have
+- You want to proactively suggest a capability that would unlock a better outcome
+- Use \`focus: "recommendations"\` for quick synergy-ranked suggestions
+
+When recommending, explain the *synergy* — why this addition matters given what's already enabled. Direct them to **Settings > Tool Sets** to enable.
 `
     : "";
 
-  return `${agentConfig.systemPrompt}${conversationHistory}${memorySection}${tabSection}${knowledgeBaseSection}${customToolSection}${schedulesSection}${automationsSection}${capabilitiesSection}${autonomySection}${scheduleGuidance}${automationGuidance}${agentMessageGuidance}${notionGuidance}${slackGuidance}${discordGuidance}${gcalGuidance}${gdriveGuidance}${gsheetsGuidance}${gmailGuidance}${imageGenGuidance}${customToolGuidance}${availableIntegrationsSection}
+  return `${agentConfig.systemPrompt}${conversationHistory}${memorySection}${tabSection}${knowledgeBaseSection}${customToolSection}${schedulesSection}${automationsSection}${capabilitiesSection}${autonomySection}${scheduleGuidance}${automationGuidance}${agentMessageGuidance}${notionGuidance}${slackGuidance}${discordGuidance}${gcalGuidance}${gdriveGuidance}${gsheetsGuidance}${gmailGuidance}${imageGenGuidance}${customToolGuidance}${selfAssessmentSection}
 ## Interactive Questions
 When you need the user to choose between options (onboarding, preferences, configuration), use the \`ask_questions\` tool INSTEAD of writing numbered questions in plain text. This renders clickable option cards the user can select from. Do NOT duplicate the questions in your text — the tool handles display. Use this whenever you'd otherwise write "do you want A, B, or C?"
 
