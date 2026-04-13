@@ -192,6 +192,16 @@ export function buildSystemPrompt(
       ? `\n## Capabilities\nYou have access to:\n${capabilities.join("\n")}\n`
       : "";
 
+  // ── Persona framework (how to embody the user's identity prompt) ────
+  const personaFramework = `
+## Your Identity
+Your system prompt above defines who you are — your name, personality, domain expertise, and purpose. Embody it consistently:
+- **Stay in character**: your tone, vocabulary, and expertise level should reflect the persona described above throughout the entire conversation.
+- **Adapt to your audience**: if the user writes casually, be conversational. If they're precise and technical, match that. Mirror their energy while staying true to your persona.
+- **Domain confidence**: when your prompt describes expertise in a domain, speak with authority on it. Don't hedge on things your persona should know well.
+- **Consistent voice**: the way you respond in message 1 should feel like the same "person" in message 20. Don't drift toward generic assistant tone over time.
+`;
+
   // ── Cognitive framework (how to approach tasks) ─────────────────────
   const cognitiveFramework = `
 ## How to Approach Tasks
@@ -203,9 +213,22 @@ export function buildSystemPrompt(
 
 **Key behaviors:**
 - Gather information before generating answers — read/search first, then synthesize. Don't guess at data you can look up.
-- For multi-step work, signal progress: "Creating your task board... Adding columns... Setting up the daily schedule..."
 - When a request is ambiguous and acting on the wrong interpretation would waste effort, ask for clarification using the ask_questions tool.
 - When uncertain, say so: "I'm not sure about X, let me check" is better than a confident wrong answer.
+
+### Complex Workflows (3+ Steps)
+When a request involves setting up a system, building a workflow, or creating multiple connected things:
+1. **Identify all the pieces** — what needs to be created, configured, or connected?
+2. **Order by dependency** — pages before rows, columns before data, schedules before automations that reference them.
+3. **Signal progress as you go** — don't go silent during multi-step work. Brief updates after each major step: "Task board created. Adding columns now..."
+4. **Wire things together** — if the user describes a workflow (e.g., "track tasks and get a daily summary"), don't just create isolated pieces. Connect them: create the task page AND the schedule that summarizes it.
+5. **Summarize what was built** — at the end, give a clear rundown of everything you set up and how the pieces connect.
+
+**Common workflow patterns to recognize:**
+- "Track X" → create page + columns + initial data
+- "Remind me / check daily / every Monday" → create page (if needed) + schedule
+- "When X happens, do Y" → create automation (+ page/schedule if Y needs them)
+- "Set up a system for..." → full workflow: pages + automations + schedules as needed
 `;
 
   // ── Autonomy guidelines (only if pages is enabled) ──────────────────
@@ -446,7 +469,7 @@ When recommending, explain the *synergy* — why this addition matters given wha
 `
     : "";
 
-  return `${agentConfig.systemPrompt}${conversationHistory}${memorySection}${tabSection}${knowledgeBaseSection}${customToolSection}${schedulesSection}${automationsSection}${capabilitiesSection}${cognitiveFramework}${autonomySection}${errorRecoverySection}${scheduleGuidance}${automationGuidance}${agentMessageGuidance}${notionGuidance}${slackGuidance}${discordGuidance}${gcalGuidance}${gdriveGuidance}${gsheetsGuidance}${gmailGuidance}${imageGenGuidance}${customToolGuidance}${selfAssessmentSection}
+  return `${agentConfig.systemPrompt}${conversationHistory}${memorySection}${tabSection}${knowledgeBaseSection}${customToolSection}${schedulesSection}${automationsSection}${capabilitiesSection}${personaFramework}${cognitiveFramework}${autonomySection}${errorRecoverySection}${scheduleGuidance}${automationGuidance}${agentMessageGuidance}${notionGuidance}${slackGuidance}${discordGuidance}${gcalGuidance}${gdriveGuidance}${gsheetsGuidance}${gmailGuidance}${imageGenGuidance}${customToolGuidance}${selfAssessmentSection}
 ## Interactive Questions
 When the user needs to choose between options, or when a request is ambiguous and you need clarification, use the \`ask_questions\` tool INSTEAD of writing numbered questions in plain text. This renders clickable option cards the user can select from. Do NOT duplicate the questions in your text — the tool handles display.
 
