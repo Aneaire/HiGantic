@@ -375,6 +375,47 @@ export class AgentConvexClient {
     return result;
   }
 
+  /**
+   * Fetch the user's stored API key for the given AI provider type
+   * ("anthropic" | "google_ai" | "openai"). Returns null if the user has not
+   * configured that credential (caller should then fall back to server env var).
+   * Cached per agent+provider using the same TTL as tool-set credentials.
+   */
+  async getAiProviderApiKey(
+    agentId: string,
+    providerType: string
+  ): Promise<string | null> {
+    const cacheKey = `ai:${agentId}:${providerType}`;
+    const cached = credentialCache.get(cacheKey);
+    if (cached && Date.now() < cached.expiresAt) {
+      return cached.value as string | null;
+    }
+
+    let apiKey: string | null = null;
+    try {
+      const result = await this.client.action(
+        api.credentialActions.getAiProviderApiKey,
+        {
+          serverToken: this.serverToken,
+          agentId: agentId as any,
+          providerType,
+        }
+      );
+      apiKey = result?.apiKey ?? null;
+    } catch (err: any) {
+      console.error(
+        `[credential] getAiProviderApiKey(${providerType}) failed:`,
+        err?.message ?? err
+      );
+    }
+
+    credentialCache.set(cacheKey, {
+      value: apiKey,
+      expiresAt: Date.now() + CREDENTIAL_CACHE_TTL_MS,
+    });
+    return apiKey;
+  }
+
   // ── Document / RAG ──────────────────────────────────────────────────
 
   async searchDocumentChunks(agentId: string, embedding: number[]) {

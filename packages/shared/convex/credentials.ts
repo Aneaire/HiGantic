@@ -24,6 +24,21 @@ export const list = query({
   },
 });
 
+/** Returns which AI provider credential types the user has configured (e.g. ["anthropic", "google_ai"]) */
+export const listAiProviders = query({
+  handler: async (ctx) => {
+    const user = await requireAuthUser(ctx);
+    const AI_PROVIDER_TYPES = ["anthropic", "google_ai", "openai"];
+    const creds = await ctx.db
+      .query("credentials")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .collect();
+    return creds
+      .filter((c) => AI_PROVIDER_TYPES.includes(c.type))
+      .map((c) => c.type);
+  },
+});
+
 export const listForAgent = query({
   args: { agentId: v.id("agents") },
   handler: async (ctx, args) => {
@@ -207,6 +222,27 @@ export const _getLinkByAgentToolset = internalQuery({
   },
 });
 
+/** Look up a user's AI-provider credential of the given type. AI providers
+ * (anthropic / google_ai / openai) are user-scoped rather than linked to a tool
+ * set, so the runtime matches by userId + type. Prefers a credential marked
+ * valid; falls back to any match so a never-tested key still works. */
+export const _getUserAiProviderCredential = internalQuery({
+  args: {
+    userId: v.id("users"),
+    providerType: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const creds = await ctx.db
+      .query("credentials")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .collect();
+    const matching = creds.filter((c) => c.type === args.providerType);
+    return (
+      matching.find((c) => c.status === "valid") ?? matching[0] ?? null
+    );
+  },
+});
+
 export const _insertOAuthState = internalMutation({
   args: {
     state: v.string(),
@@ -214,6 +250,7 @@ export const _insertOAuthState = internalMutation({
     scopes: v.array(v.string()),
     createdAt: v.number(),
     expiresAt: v.number(),
+    credentialIdToUpdate: v.optional(v.id("credentials")),
   },
   handler: async (ctx, args) => {
     const user = await requireAuthUser(ctx);
@@ -242,6 +279,25 @@ export const _insertCredentialFromOAuth = internalMutation({
       iv: args.iv,
       status: "valid",
       createdAt: now,
+      updatedAt: now,
+    });
+  },
+});
+
+export const updateCredentialFromOAuth = mutation({
+  args: {
+    serverToken: v.string(),
+    credentialId: v.id("credentials"),
+    encryptedData: v.string(),
+    iv: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    const now = Date.now();
+    await ctx.db.patch(args.credentialId, {
+      encryptedData: args.encryptedData,
+      iv: args.iv,
+      status: "valid",
       updatedAt: now,
     });
   },

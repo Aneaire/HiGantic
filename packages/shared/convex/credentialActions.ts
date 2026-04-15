@@ -208,6 +208,45 @@ export const getDecryptedForUser = action({
   },
 });
 
+// ── Server-facing AI-provider key lookup ──────────────────────────────
+
+/** Returns `{ apiKey }` for the given agent's owning user and AI provider
+ * type ("anthropic" | "google_ai" | "openai"), or null if the user has not
+ * stored that credential. Used by the agent runtime to thread BYOK keys into
+ * the Vercel AI SDK's model factory. */
+export const getAiProviderApiKey = action({
+  args: {
+    serverToken: v.string(),
+    agentId: v.id("agents"),
+    providerType: v.string(),
+  },
+  handler: async (ctx, args): Promise<{ apiKey: string } | null> => {
+    const expected = process.env.AGENT_SERVER_TOKEN;
+    if (!expected || args.serverToken !== expected) {
+      throw new Error("Invalid server token");
+    }
+
+    const agent: any = await ctx.runQuery(internal.agents._get, {
+      agentId: args.agentId,
+    });
+    if (!agent) return null;
+
+    const cred: any = await ctx.runQuery(
+      internal.credentials._getUserAiProviderCredential,
+      { userId: agent.userId, providerType: args.providerType }
+    );
+    if (!cred) return null;
+
+    try {
+      const data = JSON.parse(decrypt(cred.encryptedData, cred.iv));
+      if (!data?.apiKey || typeof data.apiKey !== "string") return null;
+      return { apiKey: data.apiKey };
+    } catch {
+      return null;
+    }
+  },
+});
+
 // ── Server-facing decrypt (agent runtime) ─────────────────────────────
 
 export const getDecryptedForAgent = action({
@@ -248,6 +287,49 @@ export const getDecryptedForAgent = action({
 });
 
 // ── OAuth2 start ──────────────────────────────────────────────────────
+
+export const reconnectOAuth = action({
+  args: {
+    provider: v.string(),
+    scopes: v.array(v.string()),
+    credentialId: v.id("credentials"),
+  },
+  handler: async (ctx, args) => {
+    const typeDef = getCredentialTypeDef(args.provider);
+    if (!typeDef?.oauth2) throw new Error(`Provider ${args.provider} does not support OAuth2`);
+
+    const { randomBytes } = await import("crypto");
+    const state = randomBytes(32).toString("hex");
+    const now = Date.now();
+
+    await ctx.runMutation(internal.credentials._insertOAuthState, {
+      state,
+      provider: args.provider,
+      scopes: args.scopes,
+      createdAt: now,
+      expiresAt: now + 10 * 60 * 1000,
+      credentialIdToUpdate: args.credentialId,
+    });
+
+    const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+    const serverUrl = process.env.AGENT_SERVER_PUBLIC_URL;
+    if (!clientId || !serverUrl) {
+      throw new Error("Google OAuth not configured (missing GOOGLE_OAUTH_CLIENT_ID or AGENT_SERVER_PUBLIC_URL)");
+    }
+
+    const redirectUri = `${serverUrl}/oauth/callback`;
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: args.scopes.join(" "),
+      state,
+      ...(typeDef.oauth2.extraParams ?? {}),
+    });
+
+    return { authUrl: `${typeDef.oauth2.authUrl}?${params.toString()}` };
+  },
+});
 
 export const startOAuth = action({
   args: {

@@ -1,23 +1,12 @@
-import { tool } from "@anthropic-ai/claude-agent-sdk";
+import { tool } from "../ai-sdk-shim.js";
 import { z } from "zod";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { AgentConvexClient } from "../convex-client.js";
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-
-async function embedQuery(text: string): Promise<number[]> {
-  if (!GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY is not configured — cannot generate embeddings");
-  }
-  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
-  const result = await model.embedContent(text);
-  return result.embedding.values;
-}
+import { embedText } from "../embeddings.js";
 
 export function createRagTools(
   convexClient: AgentConvexClient,
-  agentId: string
+  agentId: string,
+  googleApiKey?: string | null
 ) {
   const searchDocuments = tool(
     "search_documents",
@@ -29,7 +18,7 @@ export function createRagTools(
     },
     async (input) => {
       try {
-        const embedding = await embedQuery(input.query);
+        const embedding = await embedText(input.query, googleApiKey);
         const results = await convexClient.searchDocumentChunks(agentId, embedding);
 
         if (!results || results.length === 0) {

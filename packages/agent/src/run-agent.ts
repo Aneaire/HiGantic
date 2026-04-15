@@ -1,15 +1,15 @@
-import { query } from "@anthropic-ai/claude-agent-sdk";
+import type { CoreMessage } from "ai";
 import { existsSync, mkdirSync } from "fs";
 import { AgentConvexClient } from "./convex-client.js";
-import { buildMcpServer, buildAllowedTools } from "./mcp-server.js";
+import { buildMcpServer } from "./mcp-server.js";
 import { buildSystemPrompt } from "./system-prompt.js";
-import { runGeminiAgent } from "./run-gemini-agent.js";
 import { getCredentialToolSetKeys } from "@agent-maker/shared/src/tool-set-registry";
 import { embedText } from "./embeddings.js";
-
-export function isGeminiModel(model: string): boolean {
-  return model.startsWith("gemini-");
-}
+import { runWithAiSdk } from "./run-with-ai-sdk.js";
+import {
+  providerTypeForModel,
+  assertProviderCredentialAvailable,
+} from "./model-factory.js";
 
 export interface RunAgentParams {
   agentId: string;
@@ -75,11 +75,9 @@ class StreamFlusher {
 
   /** Update the progress text of a running tool call (matched by name, last match) */
   updateToolProgress(toolName: string, progress: string) {
-    // Find the last tool call matching this name that has no output yet (still running)
     for (let i = this.toolCalls.length - 1; i >= 0; i--) {
       const tc = this.toolCalls[i];
-      const cleanName = tc.name.replace(/^mcp__[^_]+__/, "");
-      if ((cleanName === toolName || tc.name === toolName) && !tc.output) {
+      if ((tc.name === toolName) && !tc.output) {
         this.toolCalls[i] = { ...tc, progress };
         this.flushNow("processing");
         return;
@@ -106,7 +104,6 @@ class StreamFlusher {
   }
 
   private get debounceMs(): number {
-    // Reduced debounce: 25ms for short text, 50ms for longer text
     return this.text.length < 500 ? 25 : 50;
   }
 
@@ -123,7 +120,6 @@ class StreamFlusher {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
     }
-    // If a mutation is already in-flight, coalesce: just mark pending
     if (this.inflightMutation) {
       this.pendingFlush = { status };
       return;
@@ -148,7 +144,6 @@ class StreamFlusher {
       .catch((err) => console.error("StreamFlusher mutation error:", err))
       .finally(() => {
         this.inflightMutation = null;
-        // If updates accumulated while this mutation was in-flight, flush them now
         if (this.pendingFlush && !this._stopped) {
           const { status: pendingStatus } = this.pendingFlush;
           this.pendingFlush = null;
@@ -167,51 +162,21 @@ export async function runAgent(params: RunAgentParams) {
     params.serverToken
   );
 
-  // Fetch agent + chat-source state upfront so we can compute the effective
-  // model (which may differ from agent.model in bot mode) BEFORE deciding
-  // which runner to route to. Without this, a bot-mode override that crosses
-  // providers (e.g. Claude agent + Gemini bot) would route to the wrong runner.
-  const [agent, discordSourcePre, slackSourcePre] = await Promise.all([
-    convexClient.getAgent(params.agentId),
-    convexClient.getDiscordSourceForConversation(params.conversationId),
-    convexClient.getSlackSourceForConversation(params.conversationId),
-  ]);
-
-  const isDiscordBotPre = discordSourcePre?.mode === "bot";
-  const isSlackBotPre = slackSourcePre?.mode === "bot";
-
-  const preEffectiveModel =
-    isDiscordBotPre && (agent as any)?.discordBotModel
-      ? (agent as any).discordBotModel
-      : isSlackBotPre && (agent as any)?.slackBotModel
-        ? (agent as any).slackBotModel
-        : agent?.model;
-
-  if (agent && isGeminiModel(preEffectiveModel || "")) {
-    return runGeminiAgent({ ...params, modelOverride: preEffectiveModel });
-  }
-
   const flusher = new StreamFlusher(convexClient, params.assistantMessageId);
 
   try {
-    // Update status to processing
-    await convexClient.updateMessage(
-      params.assistantMessageId,
-      "",
-      "processing"
-    );
+    await convexClient.updateMessage(params.assistantMessageId, "", "processing");
 
-    // Load agent config (already loaded above)
+    const agent = await convexClient.getAgent(params.agentId);
     if (!agent) throw new Error("Agent not found");
 
-    // Load all data in parallel for maximum performance
     const enabled = agent.enabledToolSets ?? [];
 
-    // Credential loading (parallel)
     const toolSetsNeedingCreds = getCredentialToolSetKeys();
-    const enabledCredToolSets = toolSetsNeedingCreds.filter((ts) => enabled.includes(ts));
+    const enabledCredToolSets = toolSetsNeedingCreds.filter((ts) =>
+      enabled.includes(ts)
+    );
 
-    // Fire ALL queries in parallel — no waterfalls
     const [
       allMessages,
       tabs,
@@ -225,7 +190,7 @@ export async function runAgent(params: RunAgentParams) {
       convexClient.listMessages(params.conversationId),
       convexClient.listTabs(params.agentId).then((r) => r ?? []),
       convexClient.listCustomTools(params.agentId).then((r) => r ?? []),
-      convexClient.listMemories(params.agentId), // all memories; filtered below if many
+      convexClient.listMemories(params.agentId),
       enabled.includes("rag")
         ? convexClient.listAgentDocuments(params.agentId)
         : Promise.resolve([]),
@@ -240,7 +205,6 @@ export async function runAgent(params: RunAgentParams) {
       ),
     ]);
 
-    // Map credential results back to config object
     const configs: Record<string, any> = {};
     enabledCredToolSets.forEach((ts, i) => {
       configs[ts] = credResults[i];
@@ -256,7 +220,13 @@ export async function runAgent(params: RunAgentParams) {
     const gmailConfig = configs.gmail ?? null;
     const imageGenConfig = configs.image_generation ?? null;
 
-    // Check if this conversation is Discord- or Slack-sourced (needed early for history filtering)
+    // Fetch the user's stored Google AI key once up front — it's used both for
+    // system-prompt memory embedding and for tool runtime (memory/RAG).
+    const googleApiKey = await convexClient.getAiProviderApiKey(
+      params.agentId,
+      "google_ai"
+    );
+
     const [discordSource, slackSource] = await Promise.all([
       convexClient.getDiscordSourceForConversation(params.conversationId),
       convexClient.getSlackSourceForConversation(params.conversationId),
@@ -269,9 +239,6 @@ export async function runAgent(params: RunAgentParams) {
     const isSlack = isSlackBot || isSlackAgent;
     const isExternalChat = isDiscord || isSlack;
 
-    // Build a "who sent this message" block for Slack so the agent can address
-    // the requester by name. Uses the last mentioner recorded on the slack
-    // conversation map, which is updated on every inbound event.
     const slackRequesterBlock = (() => {
       if (!isSlack) return "";
       const name = (slackSource as any)?.lastMentionerUserName as string | undefined;
@@ -285,17 +252,17 @@ The current message is from Slack user **${display}**${name && uid ? ` (<@${uid}
 Address them by name when it feels natural — especially in greetings, confirmations, or when multiple people may be in the channel. Don't force it into every sentence.`;
     })();
 
-    // For Discord/Slack conversations, limit history to last 24 hours for context window optimization
     let effectiveMessages = allMessages;
     let olderMessageCount = 0;
     if (isExternalChat) {
       const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
-      const recent = allMessages.filter((m: any) => m._creationTime >= twentyFourHoursAgo);
+      const recent = allMessages.filter(
+        (m: any) => m._creationTime >= twentyFourHoursAgo
+      );
       olderMessageCount = allMessages.length - recent.length;
       effectiveMessages = recent;
     }
 
-    // Build conversation messages (exclude the placeholder assistant message)
     const apiMessages = effectiveMessages
       .filter(
         (m: any) =>
@@ -306,7 +273,6 @@ Address them by name when it feels natural — especially in greetings, confirma
         content: m.content,
       }));
 
-    // Extract the latest user message as the prompt
     const latestUserMsg = [...effectiveMessages]
       .filter((m: any) => m._id !== params.assistantMessageId)
       .reverse()
@@ -338,9 +304,7 @@ Address them by name when it feels natural — especially in greetings, confirma
           att.contentType === "application/json"
         ) {
           try {
-            const resp = await fetch(url, {
-              signal: AbortSignal.timeout(10000),
-            });
+            const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
             const text = await resp.text();
             attachmentParts.push(
               `[Attached file: ${att.fileName}]\n\`\`\`\n${text.slice(0, 50000)}\n\`\`\``
@@ -361,8 +325,6 @@ Address them by name when it feels natural — especially in greetings, confirma
       }
     }
 
-    // Build conversation history (everything except the latest user message)
-    // For long conversations, keep only the most recent messages to manage context window
     const MAX_HISTORY_MESSAGES = 30;
     const allHistoryMessages = apiMessages.slice(0, -1);
     let historyMessages = allHistoryMessages;
@@ -371,26 +333,39 @@ Address them by name when it feels natural — especially in greetings, confirma
       truncatedMessageCount = allHistoryMessages.length - MAX_HISTORY_MESSAGES;
       historyMessages = allHistoryMessages.slice(-MAX_HISTORY_MESSAGES);
     }
-    const truncationNote = truncatedMessageCount > 0
-      ? `> [${truncatedMessageCount} earlier messages in this conversation are not shown]\n\n`
-      : "";
+    const truncationNote =
+      truncatedMessageCount > 0
+        ? `> [${truncatedMessageCount} earlier messages in this conversation are not shown]\n\n`
+        : "";
     const conversationHistory =
       historyMessages.length > 0
-        ? `\n\n## Conversation History\n${truncationNote}${historyMessages.map((m) => `<${m.role}>\n${m.content}\n</${m.role}>`).join("\n\n")}\n`
+        ? `\n\n## Conversation History\n${truncationNote}${historyMessages
+            .map((m) => `<${m.role}>\n${m.content}\n</${m.role}>`)
+            .join("\n\n")}\n`
         : "";
 
-    // Note about older messages beyond 24h window (Discord only)
-    const olderHistoryNote = olderMessageCount > 0
-      ? `\n\n> Note: ${olderMessageCount} older messages exist beyond the 24-hour context window. Use the recall_channel_history tool to access them if needed.`
-      : "";
+    const olderHistoryNote =
+      olderMessageCount > 0
+        ? `\n\n> Note: ${olderMessageCount} older messages exist beyond the 24-hour context window. Use the recall_channel_history tool to access them if needed.`
+        : "";
 
-    // Build system prompt with full context
+    // Effective model + bot mode gating
+    const effectiveModel =
+      isDiscordBot && (agent as any).discordBotModel
+        ? (agent as any).discordBotModel
+        : isSlackBot && (agent as any).slackBotModel
+          ? (agent as any).slackBotModel
+          : agent.model;
+
+    const isBotMode = isDiscordBot || isSlackBot;
+    const effectiveToolSets = isBotMode ? [] : agent.enabledToolSets;
+    const effectiveTabs = isBotMode ? [] : tabs;
+    const effectiveCustomTools = isBotMode ? [] : customTools;
+
+    // Build system prompt
     let systemPrompt: string;
 
     if (isDiscordBot && (agent as any).discordBotPrompt) {
-      // Bot mode: use the custom Discord bot prompt + conversation history.
-      // History may contain prior authorized "agent" turns — instruct Claude
-      // to ignore any tool/capability claims from those.
       systemPrompt = `${(agent as any).discordBotPrompt}${conversationHistory}${olderHistoryNote}
 
 ## Context
@@ -401,10 +376,6 @@ You have NO tools available right now. You cannot list channels, send messages, 
 
 If the conversation history above shows previous responses from this bot that listed tools, capabilities, integrations, or used any tool — those messages are from a DIFFERENT, privileged user session and DO NOT apply to you. Never claim you have those tools. Never list them. If asked "what can you do" or "what tools do you have", say only that you're a friendly assistant who can chat about general topics.`;
     } else if (isSlackBot && (agent as any).slackBotPrompt) {
-      // Slack bot mode: use the custom Slack bot prompt + conversation history.
-      // The conversation history may contain prior turns from authorized "agent"
-      // users that listed tools/capabilities — we MUST tell Claude to ignore
-      // any of that, since this user has none of those tools available.
       systemPrompt = `${(agent as any).slackBotPrompt}${conversationHistory}${olderHistoryNote}
 
 ## Context
@@ -415,11 +386,6 @@ You have NO tools available right now. You cannot list channels, send messages, 
 
 If the conversation history above shows previous responses from "HiGantic" that listed tools, capabilities, integrations, or used any tool — those messages are from a DIFFERENT, privileged user session and DO NOT apply to you. Never claim you have those tools. Never list them. Never describe them. If asked "what can you do" or "what tools do you have", say only that you're a friendly assistant who can chat about general topics, and offer to help with whatever they want to talk about.${slackRequesterBlock}`;
     } else {
-      // Normal agent mode (including Discord/Slack agent mode)
-
-      // ── Relevance-filtered memories ─────────────────────────────────
-      // When the agent has many memories (>15), use vector search to surface
-      // the most relevant ones for this turn instead of dumping them all.
       const MAX_SYSTEM_PROMPT_MEMORIES = 15;
       let effectiveMemories = memories ?? [];
       if (
@@ -428,7 +394,7 @@ If the conversation history above shows previous responses from "HiGantic" that 
         prompt
       ) {
         try {
-          const embedding = await embedText(prompt);
+          const embedding = await embedText(prompt, googleApiKey);
           const relevant = await convexClient.searchMemoriesVector(
             params.agentId,
             embedding,
@@ -438,7 +404,6 @@ If the conversation history above shows previous responses from "HiGantic" that 
             effectiveMemories = relevant as any;
           }
         } catch {
-          // Embedding failed — fall back to all memories (truncated)
           effectiveMemories = effectiveMemories.slice(-MAX_SYSTEM_PROMPT_MEMORIES);
         }
       }
@@ -477,30 +442,11 @@ You have conversation history from this channel. Reference it naturally when the
       }
     }
 
-    // In bot mode, use the bot model if configured
-    const effectiveModel =
-      isDiscordBot && (agent as any).discordBotModel
-        ? (agent as any).discordBotModel
-        : isSlackBot && (agent as any).slackBotModel
-          ? (agent as any).slackBotModel
-          : agent.model;
-
-    // In bot mode (unauthorized external user), strip ALL tools so the agent
-    // can't access memory, pages, integrations, or anything else. The bot
-    // prompt is purely advisory otherwise — Claude will happily call tools
-    // if they're available.
-    const isBotMode = isDiscordBot || isSlackBot;
-    const effectiveToolSets = isBotMode ? [] : agent.enabledToolSets;
-    const effectiveTabs = isBotMode ? [] : tabs;
-    const effectiveCustomTools = isBotMode ? [] : customTools;
-
-    // Create progress callback for tools that support streaming progress
     const onToolProgress: ToolProgressCallback = (toolName, progress) => {
       flusher.updateToolProgress(toolName, progress);
     };
 
-    // Create MCP server with dynamic tools (no tools at all in bot mode)
-    const mcpServer = buildMcpServer({
+    const { tools } = buildMcpServer({
       convexClient,
       agentId: params.agentId,
       messageId: params.assistantMessageId,
@@ -518,15 +464,10 @@ You have conversation history from this channel. Reference it naturally when the
       gmailConfig: isBotMode ? null : (gmailConfig as any),
       imageGenConfig: isBotMode ? null : (imageGenConfig as any),
       imageGenModel: isBotMode ? undefined : agent.imageGenModel,
+      googleApiKey,
       onToolProgress,
       isDiscordConversation: isExternalChat,
     });
-
-    const allowedTools = buildAllowedTools(
-      effectiveToolSets,
-      effectiveTabs as any,
-      effectiveCustomTools as any
-    );
 
     // Ensure workspace directory exists
     const agentCwd = `/tmp/agent-workspace-${params.agentId}`;
@@ -534,120 +475,32 @@ You have conversation history from this channel. Reference it naturally when the
       mkdirSync(agentCwd, { recursive: true });
     }
 
-    // Run the agent
-    let responseText = "";
-    let lastTurnHadToolUse = false;
-
     console.log(
-      `[agent] Starting run for agent="${agent.name}" conversation=${params.conversationId}`
+      `[agent] Starting run for agent="${agent.name}" model="${effectiveModel || "claude-sonnet-4-6"}" conversation=${params.conversationId}`
     );
 
-    const agentStream = query({
-      prompt,
-      options: {
-        systemPrompt,
-        cwd: agentCwd,
-        mcpServers: { "agent-tools": mcpServer },
-        allowedTools,
-        permissionMode: "bypassPermissions",
-        allowDangerouslySkipPermissions: true,
-        includePartialMessages: true,
-        maxTurns: 20,
-        model: effectiveModel || "claude-sonnet-4-6",
-        stderr: (data: string) => {
-          console.error("[agent] CLI stderr:", data);
-        },
-      },
+    // Resolve the BYOK API key for the selected model's provider. Falls back to
+    // the agent server's env var when the user has no credential stored.
+    const modelIdForRun = effectiveModel || "claude-sonnet-4-6";
+    const providerType = providerTypeForModel(modelIdForRun);
+    const byokApiKey = providerType
+      ? await convexClient.getAiProviderApiKey(params.agentId, providerType)
+      : null;
+    assertProviderCredentialAvailable(modelIdForRun, byokApiKey);
+
+    // Build the messages array: just the latest user prompt
+    // (conversation history is already embedded in the system prompt)
+    const messages: CoreMessage[] = [{ role: "user", content: prompt }];
+
+    await runWithAiSdk({
+      flusher,
+      modelId: modelIdForRun,
+      system: systemPrompt,
+      messages,
+      tools,
+      apiKey: byokApiKey,
     });
 
-    for await (const message of agentStream) {
-      if (flusher.stopped) {
-        console.log("[agent] User stopped — breaking out of stream loop.");
-        break;
-      }
-
-      if (message.type === "stream_event") {
-        const event = (message as any).event;
-        if (!event) continue;
-
-        if (event.type === "content_block_delta" && event.delta) {
-          if (event.delta.type === "text_delta" && event.delta.text) {
-            if (lastTurnHadToolUse && responseText.length > 0) {
-              // Only add paragraph break if previous text ends at a sentence boundary;
-              // otherwise use a space to avoid splitting mid-sentence (e.g. "Let\n\nme...")
-              const trimmed = responseText.trimEnd();
-              const endsAtBoundary = /[.!?:;\n\r\]})>`"']$/.test(trimmed);
-              const separator = endsAtBoundary ? "\n\n" : " ";
-              responseText += separator;
-              flusher.appendText(separator);
-              lastTurnHadToolUse = false;
-            }
-            responseText += event.delta.text;
-            flusher.appendText(event.delta.text);
-          }
-        }
-      } else if (message.type === "assistant" && message.message?.content) {
-        let fullText = "";
-        for (const block of message.message.content) {
-          if ("text" in block && block.text) {
-            fullText += block.text;
-          } else if ("name" in block && block.name) {
-            const cleanName = block.name.replace(/^mcp__agent-tools__/, "");
-            lastTurnHadToolUse = true;
-            flusher.upsertToolCall({
-              id: block.id ?? `tool_${Date.now()}`,
-              name: cleanName,
-              input: JSON.stringify("input" in block ? block.input : {}),
-            });
-          }
-        }
-        if (fullText && !responseText.endsWith(fullText)) {
-          if (flusher.currentText.length >= fullText.length) {
-            responseText = flusher.currentText;
-          } else if (responseText.length >= fullText.length) {
-            responseText =
-              responseText.substring(0, responseText.length - fullText.length) +
-              fullText;
-          } else {
-            responseText = fullText;
-          }
-          flusher.setText(responseText);
-        }
-      } else if (message.type === "user" && message.message?.content) {
-        const content = message.message.content;
-        if (Array.isArray(content)) {
-          for (const block of content) {
-            if (block.type === "tool_result" && block.tool_use_id) {
-              const existing = flusher.currentToolCalls.find(
-                (t) => t.id === block.tool_use_id
-              );
-              if (existing) {
-                let output: string | undefined;
-                if (typeof block.content === "string") {
-                  output = block.content;
-                } else if (Array.isArray(block.content)) {
-                  output = block.content
-                    .filter((b: any) => b.type === "text")
-                    .map((b: any) => b.text)
-                    .join("\n");
-                }
-                flusher.upsertToolCall({
-                  ...existing,
-                  output,
-                });
-              }
-            }
-          }
-        }
-      } else if (message.type === "result") {
-        if (!responseText && (message as any).subtype === "success") {
-          responseText = (message as any).result ?? "";
-          flusher.setText(responseText);
-        }
-      }
-    }
-
-    // Final flush
     if (!flusher.stopped) {
       await flusher.flushFinal("done");
     }
@@ -673,10 +526,6 @@ You have conversation history from this channel. Reference it naturally when the
     );
   } catch (error: any) {
     console.error("[agent] Error:", error.message);
-    console.error("[agent] Exit code:", error.status ?? error.exitCode);
-    if (error.stderr) {
-      console.error("[agent] Stderr:", error.stderr.substring(0, 2000));
-    }
     flusher.setText(
       `I encountered an error: ${error.message}. Please try again.`
     );

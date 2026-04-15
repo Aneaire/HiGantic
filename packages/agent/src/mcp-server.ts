@@ -1,8 +1,9 @@
-import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
+import type { Tool } from "ai";
+import { createSdkMcpServer, tool } from "./ai-sdk-shim.js";
 import { z } from "zod";
 import type { AgentConvexClient } from "./convex-client.js";
 import { createMemoryTools } from "./tools/memory-tools.js";
-import { createPageTools, getPageToolNames } from "./tools/page-tools.js";
+import { createPageTools } from "./tools/page-tools.js";
 import { createCustomHttpTools } from "./tools/custom-http-tools.js";
 import { createSuggestTools } from "./tools/suggest-tools.js";
 import { createRagTools } from "./tools/rag-tools.js";
@@ -91,7 +92,7 @@ interface GmailConfig {
 interface McpServerDeps {
   convexClient: AgentConvexClient;
   agentId: string;
-  messageId: string;
+  messageId?: string;
   conversationId?: string;
   enabledToolSets: string[];
   tabs: Tab[];
@@ -106,6 +107,9 @@ interface McpServerDeps {
   imageGenConfig?: ImageGenConfig | null;
   imageGenModel?: string | null;
   gmailConfig?: GmailConfig | null;
+  /** User's Google AI API key (for embedding-backed memory + RAG). Optional —
+   * tools fall back to the server env-var key when absent. */
+  googleApiKey?: string | null;
   onToolProgress?: (toolName: string, progress: string) => void;
   isDiscordConversation?: boolean;
 }
@@ -115,16 +119,19 @@ function has(enabledToolSets: string[], name: string): boolean {
 }
 
 /**
- * Builds an MCP server with tools dynamically loaded based on the agent's
- * enabledToolSets, existing page tabs, and custom HTTP tools.
+ * Builds the AI SDK tool bundle dynamically based on the agent's
+ * enabledToolSets, existing page tabs, and custom HTTP tools. Returns
+ * `{ tools: Record<string, Tool> }` — spread directly into `streamText`.
  */
-export function buildMcpServer(deps: McpServerDeps) {
-  const tools: any[] = [];
+export function buildMcpServer(deps: McpServerDeps): { tools: Record<string, Tool<any, any>> } {
+  const tools: Array<Record<string, Tool<any, any>>> = [];
   const enabled = deps.enabledToolSets;
 
   // Memory tools — gated by "memory"
   if (has(enabled, "memory")) {
-    tools.push(...createMemoryTools(deps.convexClient, deps.agentId));
+    tools.push(
+      ...createMemoryTools(deps.convexClient, deps.agentId, deps.googleApiKey)
+    );
   }
 
   // Page tools — gated by "pages"
@@ -135,14 +142,16 @@ export function buildMcpServer(deps: McpServerDeps) {
   }
 
   // Suggest replies & questions (always included — core UX, not a capability)
-  tools.push(...createSuggestTools(deps.convexClient, deps.messageId));
+  tools.push(...createSuggestTools(deps.convexClient, deps.messageId ?? ""));
 
   // Explore capabilities (always included — lets agent introspect and recommend improvements)
   tools.push(...createExploreCapabilitiesTools(deps.enabledToolSets));
 
   // RAG / Knowledge Base tools — gated by "rag"
   if (has(enabled, "rag")) {
-    tools.push(...createRagTools(deps.convexClient, deps.agentId));
+    tools.push(
+      ...createRagTools(deps.convexClient, deps.agentId, deps.googleApiKey)
+    );
   }
 
   // Email tools — gated by "email"
@@ -288,223 +297,3 @@ export function buildMcpServer(deps: McpServerDeps) {
   });
 }
 
-/**
- * Returns the list of allowed tool names for the Claude SDK,
- * filtered by the agent's enabledToolSets.
- */
-export function buildAllowedTools(
-  enabledToolSets: string[],
-  tabs: Tab[],
-  customTools: CustomToolConfig[] = []
-): string[] {
-  const allowed: string[] = [];
-
-  // Web search & fetch — gated by "web_search"
-  if (has(enabledToolSets, "web_search")) {
-    allowed.push("WebSearch", "WebFetch");
-  }
-
-  // Memory tools — gated by "memory"
-  if (has(enabledToolSets, "memory")) {
-    allowed.push(
-      "mcp__agent-tools__store_memory",
-      "mcp__agent-tools__recall_memory",
-      "mcp__agent-tools__search_memories"
-    );
-  }
-
-  // Page tools — gated by "pages"
-  if (has(enabledToolSets, "pages")) {
-    allowed.push(...getPageToolNames(tabs));
-  }
-
-  // Suggest replies & questions (always — core UX)
-  allowed.push(
-    "mcp__agent-tools__suggest_replies",
-    "mcp__agent-tools__ask_questions"
-  );
-
-  // Explore capabilities (always — self-assessment)
-  allowed.push("mcp__agent-tools__explore_capabilities");
-
-  // RAG / Knowledge Base tools — gated by "rag"
-  if (has(enabledToolSets, "rag")) {
-    allowed.push("mcp__agent-tools__search_documents");
-  }
-
-  // Email tools — gated by "email"
-  if (has(enabledToolSets, "email")) {
-    allowed.push("mcp__agent-tools__send_email");
-  }
-
-  // Custom HTTP tools — gated by "custom_http_tools"
-  if (has(enabledToolSets, "custom_http_tools")) {
-    for (const ct of customTools) {
-      allowed.push(`mcp__agent-tools__custom_${ct.name}`);
-    }
-  }
-
-  // Scheduled Actions — gated by "schedules"
-  if (has(enabledToolSets, "schedules")) {
-    allowed.push(
-      "mcp__agent-tools__create_schedule",
-      "mcp__agent-tools__list_schedules",
-      "mcp__agent-tools__pause_schedule",
-      "mcp__agent-tools__resume_schedule",
-      "mcp__agent-tools__delete_schedule"
-    );
-  }
-
-  // Automations — gated by "automations"
-  if (has(enabledToolSets, "automations")) {
-    allowed.push(
-      "mcp__agent-tools__create_automation",
-      "mcp__agent-tools__list_automations",
-      "mcp__agent-tools__delete_automation"
-    );
-  }
-
-  // Timers — gated by "timers"
-  if (has(enabledToolSets, "timers")) {
-    allowed.push(
-      "mcp__agent-tools__set_timer",
-      "mcp__agent-tools__list_timers",
-      "mcp__agent-tools__cancel_timer"
-    );
-  }
-
-  // Webhooks — gated by "webhooks"
-  if (has(enabledToolSets, "webhooks")) {
-    allowed.push(
-      "mcp__agent-tools__fire_webhook",
-      "mcp__agent-tools__list_events"
-    );
-  }
-
-  // Inter-Agent Messaging — gated by "agent_messages"
-  if (has(enabledToolSets, "agent_messages")) {
-    allowed.push(
-      "mcp__agent-tools__list_sibling_agents",
-      "mcp__agent-tools__send_to_agent",
-      "mcp__agent-tools__check_agent_messages",
-      "mcp__agent-tools__respond_to_agent"
-    );
-  }
-
-  // Notion — gated by "notion"
-  if (has(enabledToolSets, "notion")) {
-    allowed.push(
-      "mcp__agent-tools__notion_search",
-      "mcp__agent-tools__notion_query_database",
-      "mcp__agent-tools__notion_create_page",
-      "mcp__agent-tools__notion_update_page",
-      "mcp__agent-tools__notion_get_page",
-      "mcp__agent-tools__notion_append_blocks"
-    );
-  }
-
-  // Slack — gated by "slack"
-  if (has(enabledToolSets, "slack")) {
-    allowed.push(
-      "mcp__agent-tools__slack_send_message",
-      "mcp__agent-tools__slack_list_channels",
-      "mcp__agent-tools__slack_read_messages",
-      "mcp__agent-tools__slack_add_reaction",
-      "mcp__agent-tools__slack_set_topic",
-      "mcp__agent-tools__slack_search_messages",
-      "mcp__agent-tools__slack_search_files",
-      "mcp__agent-tools__slack_search_users",
-      "mcp__agent-tools__slack_list_users",
-      "mcp__agent-tools__slack_send_dm",
-      "mcp__agent-tools__slack_upload_file",
-      "mcp__agent-tools__slack_update_message",
-      "mcp__agent-tools__slack_delete_message",
-      "mcp__agent-tools__slack_schedule_message",
-      "mcp__agent-tools__slack_get_permalink",
-      "mcp__agent-tools__slack_lookup_user_by_email",
-      "mcp__agent-tools__slack_pin_message",
-      "mcp__agent-tools__slack_unpin_message",
-      "mcp__agent-tools__slack_create_channel",
-      "mcp__agent-tools__slack_join_channel",
-      "mcp__agent-tools__slack_invite_to_channel",
-      "mcp__agent-tools__slack_authorize_user",
-      "mcp__agent-tools__slack_deauthorize_user",
-      "mcp__agent-tools__slack_list_authorized_users"
-    );
-  }
-
-  // Discord — gated by "discord"
-  if (has(enabledToolSets, "discord")) {
-    allowed.push(
-      "mcp__agent-tools__discord_send_message",
-      "mcp__agent-tools__discord_list_guilds",
-      "mcp__agent-tools__discord_list_channels",
-      "mcp__agent-tools__discord_read_messages",
-      "mcp__agent-tools__discord_add_reaction",
-      "mcp__agent-tools__discord_create_thread",
-      "mcp__agent-tools__discord_reply_in_thread",
-      "mcp__agent-tools__recall_channel_history"
-    );
-  }
-
-  // Google Calendar — gated by "google_calendar"
-  if (has(enabledToolSets, "google_calendar")) {
-    allowed.push(
-      "mcp__agent-tools__gcal_list_calendars",
-      "mcp__agent-tools__gcal_list_events",
-      "mcp__agent-tools__gcal_create_event",
-      "mcp__agent-tools__gcal_update_event",
-      "mcp__agent-tools__gcal_delete_event",
-      "mcp__agent-tools__gcal_find_free_time"
-    );
-  }
-
-  // Google Drive — gated by "google_drive"
-  if (has(enabledToolSets, "google_drive")) {
-    allowed.push(
-      "mcp__agent-tools__gdrive_search",
-      "mcp__agent-tools__gdrive_list_files",
-      "mcp__agent-tools__gdrive_read_file",
-      "mcp__agent-tools__gdrive_create_file",
-      "mcp__agent-tools__gdrive_move_file",
-      "mcp__agent-tools__gdrive_delete_file"
-    );
-  }
-
-  // Google Sheets — gated by "google_sheets"
-  if (has(enabledToolSets, "google_sheets")) {
-    allowed.push(
-      "mcp__agent-tools__gsheets_list_spreadsheets",
-      "mcp__agent-tools__gsheets_create",
-      "mcp__agent-tools__gsheets_get_info",
-      "mcp__agent-tools__gsheets_read",
-      "mcp__agent-tools__gsheets_write",
-      "mcp__agent-tools__gsheets_append",
-      "mcp__agent-tools__gsheets_clear"
-    );
-  }
-
-  // Gmail — gated by "gmail"
-  if (has(enabledToolSets, "gmail")) {
-    allowed.push(
-      "mcp__agent-tools__gmail_list_messages",
-      "mcp__agent-tools__gmail_search",
-      "mcp__agent-tools__gmail_get_message",
-      "mcp__agent-tools__gmail_send",
-      "mcp__agent-tools__gmail_reply",
-      "mcp__agent-tools__gmail_list_labels",
-      "mcp__agent-tools__gmail_modify_labels",
-      "mcp__agent-tools__gmail_get_thread"
-    );
-  }
-
-  // Image Generation — gated by "image_generation"
-  if (has(enabledToolSets, "image_generation")) {
-    allowed.push(
-      "mcp__agent-tools__generate_image",
-      "mcp__agent-tools__list_assets"
-    );
-  }
-
-  return allowed;
-}

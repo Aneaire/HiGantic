@@ -1,11 +1,12 @@
-import { tool } from "@anthropic-ai/claude-agent-sdk";
+import { tool } from "../ai-sdk-shim.js";
 import { z } from "zod";
 import type { AgentConvexClient } from "../convex-client.js";
 import { embedText } from "../embeddings.js";
 
 export function createMemoryTools(
   convexClient: AgentConvexClient,
-  agentId: string
+  agentId: string,
+  googleApiKey?: string | null
 ) {
   const storeMemory = tool(
     "store_memory",
@@ -26,7 +27,7 @@ export function createMemoryTools(
     async (input) => {
       let embedding: number[] | undefined;
       try {
-        embedding = await embedText(input.content);
+        embedding = await embedText(input.content, googleApiKey);
       } catch {}
 
       await convexClient.storeMemory(agentId, input.content, input.category, embedding);
@@ -54,7 +55,7 @@ export function createMemoryTools(
       let memories: any[] | null = null;
 
       try {
-        const embedding = await embedText(input.query);
+        const embedding = await embedText(input.query, googleApiKey);
         const results = await convexClient.searchMemoriesVector(agentId, embedding);
         if (results && results.length > 0) {
           memories = results;
@@ -98,7 +99,7 @@ export function createMemoryTools(
         let memories: any[] | null = null;
 
         try {
-          const embedding = await embedText(input.query);
+          const embedding = await embedText(input.query, googleApiKey);
           const results = await convexClient.searchMemoriesVector(agentId, embedding);
           if (results && results.length > 0) {
             memories = results;

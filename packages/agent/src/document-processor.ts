@@ -1,9 +1,9 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { embed } from "ai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import type { AgentConvexClient } from "./convex-client.js";
 
 const CHUNK_SIZE = 2000;
 const CHUNK_OVERLAP = 200;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 interface ProcessDocumentParams {
   documentId: string;
@@ -17,6 +17,18 @@ interface ProcessDocumentParams {
 export async function processDocument(params: ProcessDocumentParams) {
   const { documentId, storageUrl, fileName, fileType, agentId, convexClient } = params;
 
+  // Resolve Google AI key: prefer agent-owner's stored credential, fall back
+  // to server env var. Used for both embeddings and image description.
+  const userGoogleKey = await convexClient.getAiProviderApiKey(agentId, "google_ai");
+  const geminiApiKey =
+    userGoogleKey ??
+    process.env.GEMINI_API_KEY ??
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY ??
+    null;
+  const google = createGoogleGenerativeAI({
+    apiKey: geminiApiKey ?? undefined,
+  });
+
   try {
     await convexClient.updateDocumentStatus(documentId, "processing");
 
@@ -27,7 +39,7 @@ export async function processDocument(params: ProcessDocumentParams) {
     }
 
     // Extract text based on file type
-    const text = await extractText(response, fileType);
+    const text = await extractText(response, fileType, geminiApiKey);
 
     if (!text.trim()) {
       throw new Error("No text content could be extracted from the file");
@@ -37,26 +49,21 @@ export async function processDocument(params: ProcessDocumentParams) {
     const chunks = chunkText(text);
 
     // Generate embeddings
-    if (!GEMINI_API_KEY) {
-      throw new Error("GEMINI_API_KEY is not configured");
-    }
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
+    const embeddingModel = google.textEmbeddingModel("text-embedding-004");
 
-    // Batch embed chunks
+    // Batch embed chunks (10 at a time to respect rate limits)
     const embeddedChunks: Array<{
       chunkIndex: number;
       content: string;
       embedding: number[];
     }> = [];
 
-    // Process in batches of 10
     for (let i = 0; i < chunks.length; i += 10) {
       const batch = chunks.slice(i, i + 10);
       const embeddings = await Promise.all(
         batch.map(async (chunk) => {
-          const result = await model.embedContent(chunk);
-          return result.embedding.values;
+          const { embedding } = await embed({ model: embeddingModel, value: chunk });
+          return embedding;
         })
       );
 
@@ -100,9 +107,13 @@ const IMAGE_MIME: Record<string, string> = {
   gif: "image/gif",
 };
 
-async function extractText(response: Response, fileType: string): Promise<string> {
+async function extractText(
+  response: Response,
+  fileType: string,
+  geminiApiKey: string | null
+): Promise<string> {
   if (IMAGE_TYPES.includes(fileType)) {
-    return await describeImage(response, fileType);
+    return await describeImage(response, fileType, geminiApiKey);
   }
 
   switch (fileType) {
@@ -129,9 +140,15 @@ async function extractText(response: Response, fileType: string): Promise<string
   }
 }
 
-async function describeImage(response: Response, fileType: string): Promise<string> {
-  if (!GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY is not configured");
+async function describeImage(
+  response: Response,
+  fileType: string,
+  geminiApiKey: string | null
+): Promise<string> {
+  if (!geminiApiKey) {
+    throw new Error(
+      "No Google AI API key available for image description. Add a Google AI credential in Settings → Credentials or set GEMINI_API_KEY."
+    );
   }
 
   const buffer = Buffer.from(await response.arrayBuffer());
@@ -139,7 +156,7 @@ async function describeImage(response: Response, fileType: string): Promise<stri
   const mimeType = IMAGE_MIME[fileType] ?? "image/png";
 
   // Use Gemini REST API directly for vision (avoids SDK version issues)
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`;
 
   const apiResponse = await fetch(apiUrl, {
     method: "POST",
