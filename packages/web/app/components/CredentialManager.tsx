@@ -64,7 +64,6 @@ export function CredentialManager({ agent, toolSetName }: CredentialManagerProps
   if (currentLink) {
     const linkedTypeDef = getCredentialTypeDef(currentLink.credentialType);
     const isOAuth = linkedTypeDef?.authMethod === "oauth2";
-    const canEdit = linkedTypeDef && !isOAuth;
     return (
       <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4 space-y-3">
         <div className="flex items-center justify-between">
@@ -81,13 +80,13 @@ export function CredentialManager({ agent, toolSetName }: CredentialManagerProps
                 credentialId={currentLink.credentialId as Id<"credentials">}
               />
             )}
-            {canEdit && !editingLinked && (
+            {linkedTypeDef && !editingLinked && (
               <button
                 onClick={() => setEditingLinked(true)}
                 className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
               >
                 <Pencil className="h-3 w-3" />
-                Edit
+                {isOAuth ? "Rename" : "Edit"}
               </button>
             )}
             <button
@@ -500,17 +499,19 @@ function InlineEditForm({
   const updateCredential = useAction(api.credentialActions.update);
   const getDecrypted = useAction(api.credentialActions.getDecryptedForUser);
 
+  const isOAuth = typeDef.authMethod === "oauth2";
   const [name, setName] = useState(currentName);
   const [fields, setFields] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
     for (const f of typeDef.fields) init[f.key] = "";
     return init;
   });
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isOAuth);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isOAuth) return;
     let cancelled = false;
     (async () => {
       try {
@@ -529,7 +530,7 @@ function InlineEditForm({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [credentialId]);
 
-  const requiredFilled = typeDef.fields
+  const requiredFilled = isOAuth || typeDef.fields
     .filter((f) => f.required)
     .every((f) => fields[f.key]?.trim());
 
@@ -540,7 +541,7 @@ function InlineEditForm({
       await updateCredential({
         credentialId,
         name: name.trim() !== currentName ? name.trim() : undefined,
-        data: fields,
+        ...(isOAuth ? {} : { data: fields }),
       });
       onDone();
     } catch (err: any) {
@@ -577,7 +578,7 @@ function InlineEditForm({
           className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none"
         />
       </div>
-      {typeDef.fields.map((field) => (
+      {!isOAuth && typeDef.fields.map((field) => (
         <div key={field.key}>
           <label className="block text-xs text-zinc-500 mb-1">
             {field.label}

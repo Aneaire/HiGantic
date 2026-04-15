@@ -303,18 +303,19 @@ export default function CredentialsPage() {
                   {!isEditing && (
                     <div className="flex items-center justify-end gap-1.5 mt-3 pt-3 border-t border-zinc-800/40">
                       <TestButton credentialId={cred._id as Id<"credentials">} />
-                      {typeDef && typeDef.authMethod === "oauth2" ? (
+                      {typeDef && typeDef.authMethod === "oauth2" && (
                         <ReconnectButton typeDef={typeDef} credentialId={cred._id as Id<"credentials">} />
-                      ) : typeDef ? (
+                      )}
+                      {typeDef && (
                         <button
                           onClick={() => setEditingId(cred._id)}
                           className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition-colors px-2 py-1.5 rounded-lg hover:bg-zinc-800"
-                          title="Edit credential"
+                          title="Rename credential"
                         >
                           <Pencil className="h-3 w-3" />
-                          Edit
+                          {typeDef.authMethod === "oauth2" ? "Rename" : "Edit"}
                         </button>
-                      ) : null}
+                      )}
                       <button
                         onClick={() => handleDelete(cred._id)}
                         className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors opacity-0 group-hover:opacity-100"
@@ -551,12 +552,14 @@ function EditCredentialForm({
     for (const f of typeDef.fields) init[f.key] = "";
     return init;
   });
-  const [loading, setLoading] = useState(true);
+  const isOAuth = typeDef.authMethod === "oauth2";
+  const [loading, setLoading] = useState(!isOAuth);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load current values once on mount
+  // Load current field values for API-key credentials (skip for OAuth — no editable fields)
   useEffect(() => {
+    if (isOAuth) return;
     let cancelled = false;
     (async () => {
       try {
@@ -577,7 +580,7 @@ function EditCredentialForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [credentialId]);
 
-  const requiredFilled = typeDef.fields
+  const requiredFilled = isOAuth || typeDef.fields
     .filter((f) => f.required)
     .every((f) => fields[f.key]?.trim());
 
@@ -588,7 +591,7 @@ function EditCredentialForm({
       await updateCredential({
         credentialId,
         name: name.trim() !== currentName ? name.trim() : undefined,
-        data: fields,
+        ...(isOAuth ? {} : { data: fields }),
       });
       onDone();
     } catch (err: any) {
@@ -627,7 +630,7 @@ function EditCredentialForm({
           className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none"
         />
       </div>
-      {typeDef.fields.map((field) => (
+      {!isOAuth && typeDef.fields.map((field) => (
         <div key={field.key}>
           <label className="block text-xs text-zinc-500 mb-1.5">
             {field.label}
