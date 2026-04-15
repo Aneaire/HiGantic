@@ -48,7 +48,10 @@ export async function runWithAiSdk(params: RunWithAiSdkParams): Promise<void> {
     system: params.system,
     messages: params.messages,
     ...(toolsArg ? { tools: toolsArg } : {}),
-    ...(toolsArg ? { maxSteps: params.maxSteps ?? 20 } : {}),
+    // AI SDK v5: `maxSteps` was removed; use `stopWhen: stepCountIs(N)` instead.
+    // Without this the runner stops after a single step, so tool-calling agents
+    // invoke one tool then finish with empty text.
+    ...(toolsArg ? { stopWhen: stepCountIs(params.maxSteps ?? 20) } : {}),
     providerOptions: getProviderOptions(params.modelId),
     onError: ({ error }) => {
       console.error("[ai-sdk] Stream error:", error);

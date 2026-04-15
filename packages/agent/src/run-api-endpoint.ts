@@ -2,7 +2,7 @@ import type { CoreMessage } from "ai";
 import { AgentConvexClient } from "./convex-client.js";
 import { buildMcpServer } from "./mcp-server.js";
 import { buildSystemPrompt } from "./system-prompt.js";
-import { generateText } from "ai";
+import { generateText, stepCountIs } from "ai";
 import {
   getLanguageModel,
   providerTypeForModel,
@@ -81,7 +81,7 @@ export async function runApiEndpoint(
     system: systemPrompt,
     messages,
     ...(toolsArg ? { tools: toolsArg } : {}),
-    ...(toolsArg ? { maxSteps: 5 } : {}),
+    ...(toolsArg ? { stopWhen: stepCountIs(5) } : {}),
   });
 
   const responseText = result.text ?? "";
