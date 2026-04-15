@@ -251,6 +251,7 @@ export const _insertOAuthState = internalMutation({
     createdAt: v.number(),
     expiresAt: v.number(),
     credentialIdToUpdate: v.optional(v.id("credentials")),
+    credentialName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await requireAuthUser(ctx);

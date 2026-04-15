@@ -331,12 +331,15 @@ function CredentialForm({
 function OAuthConnectButton({
   typeDef,
   onCancel,
+  defaultName,
 }: {
   typeDef: CredentialTypeDef;
   onCancel: () => void;
+  defaultName?: string;
 }) {
   const startOAuth = useAction(api.credentialActions.startOAuth);
   const [loading, setLoading] = useState(false);
+  const [name, setName] = useState(defaultName ?? `My ${typeDef.label}`);
 
   async function handleConnect() {
     if (!typeDef.oauth2) return;
@@ -345,6 +348,7 @@ function OAuthConnectButton({
       const { authUrl } = await startOAuth({
         provider: typeDef.type,
         scopes: typeDef.oauth2.scopes,
+        credentialName: name.trim() || undefined,
       });
       window.location.href = authUrl;
     } catch (err: any) {
@@ -358,6 +362,16 @@ function OAuthConnectButton({
       <p className="text-xs text-zinc-500">
         {typeDef.description}. Click below to authorize via OAuth.
       </p>
+      <div>
+        <label className="block text-xs text-zinc-500 mb-1.5">Credential Name</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={`My ${typeDef.label}`}
+          className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none"
+        />
+      </div>
       <div className="flex items-center gap-2">
         <button
           onClick={handleConnect}

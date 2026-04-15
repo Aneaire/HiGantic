@@ -335,6 +335,7 @@ export const startOAuth = action({
   args: {
     provider: v.string(),
     scopes: v.array(v.string()),
+    credentialName: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const typeDef = getCredentialTypeDef(args.provider);
@@ -350,6 +351,7 @@ export const startOAuth = action({
       scopes: args.scopes,
       createdAt: now,
       expiresAt: now + 10 * 60 * 1000,
+      credentialName: args.credentialName,
     });
 
     const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;

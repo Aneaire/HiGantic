@@ -323,7 +323,7 @@ app.get("/oauth/callback", async (c) => {
       await convex.mutation(api.credentials.insertCredentialFromOAuth, {
         serverToken: SERVER_TOKEN,
         userId: oauthState.userId,
-        name: `Google (${new Date().toLocaleDateString()})`,
+        name: oauthState.credentialName ?? `Google (${new Date().toLocaleDateString()})`,
         type: oauthState.provider,
         encryptedData: encrypted,
         iv,

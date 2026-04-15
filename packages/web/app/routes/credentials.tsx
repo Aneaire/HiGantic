@@ -425,6 +425,16 @@ function StandaloneCredentialForm({
     return (
       <div className="space-y-3">
         <p className="text-xs text-zinc-500">{typeDef.description}</p>
+        <div>
+          <label className="block text-xs text-zinc-500 mb-1.5">Name</label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={`My ${typeDef.label}`}
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none"
+          />
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={async () => {
@@ -433,6 +443,7 @@ function StandaloneCredentialForm({
                 const { authUrl } = await startOAuth({
                   provider: typeDef.type,
                   scopes: typeDef.oauth2!.scopes,
+                  credentialName: name.trim() || undefined,
                 });
                 window.location.href = authUrl;
               } catch (err: any) {
