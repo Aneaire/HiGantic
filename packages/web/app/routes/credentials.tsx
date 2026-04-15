@@ -269,6 +269,7 @@ export default function CredentialsPage() {
                   key={cred._id}
                   className={`group rounded-xl border border-zinc-800/60 glass-card p-4 hover:border-zinc-700/60 transition-all ${isEditing ? "sm:col-span-2" : ""}`}
                 >
+                  {/* Header row: icon + name/type + rename button */}
                   <div className="flex items-start gap-3">
                     <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-zinc-800 border border-zinc-700/50 shrink-0">
                       <ServiceIcon type={cred.type} className="h-5 w-5" />
@@ -287,6 +288,22 @@ export default function CredentialsPage() {
                         </p>
                       )}
                     </div>
+                    {/* Rename — top-right of card */}
+                    {!isEditing && typeDef && (
+                      <button
+                        onClick={() => setEditingId(cred._id)}
+                        className="shrink-0 p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Rename"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDelete(cred._id)}
+                      className="shrink-0 p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors opacity-0 group-hover:opacity-100"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
 
                   {isEditing && typeDef && (
@@ -301,27 +318,15 @@ export default function CredentialsPage() {
                   )}
 
                   {!isEditing && (
-                    <div className="flex items-center justify-end gap-1.5 mt-3 pt-3 border-t border-zinc-800/40">
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-zinc-800/40">
+                      {/* Left: Reconnect (OAuth only) */}
+                      <div>
+                        {typeDef && typeDef.authMethod === "oauth2" && (
+                          <ReconnectButton typeDef={typeDef} credentialId={cred._id as Id<"credentials">} />
+                        )}
+                      </div>
+                      {/* Right: Test */}
                       <TestButton credentialId={cred._id as Id<"credentials">} />
-                      {typeDef && typeDef.authMethod === "oauth2" && (
-                        <ReconnectButton typeDef={typeDef} credentialId={cred._id as Id<"credentials">} />
-                      )}
-                      {typeDef && (
-                        <button
-                          onClick={() => setEditingId(cred._id)}
-                          className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition-colors px-2 py-1.5 rounded-lg hover:bg-zinc-800"
-                          title="Rename credential"
-                        >
-                          <Pencil className="h-3 w-3" />
-                          {typeDef.authMethod === "oauth2" ? "Rename" : "Edit"}
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleDelete(cred._id)}
-                        className="p-1.5 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-800 transition-colors opacity-0 group-hover:opacity-100"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
                     </div>
                   )}
                 </div>
