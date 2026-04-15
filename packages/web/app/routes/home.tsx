@@ -114,6 +114,7 @@ const COPYRIGHT_YEAR = new Date().getFullYear();
 const SUPPORTED_MODELS = [
   { name: "Claude", color: "text-neon-400" },
   { name: "Gemini", color: "text-blue-400" },
+  { name: "OpenAI", color: "text-green-400" },
 ];
 
 /* ── Nav ────────────────────────────────────────────────────────────── */

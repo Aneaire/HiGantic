@@ -237,6 +237,82 @@ export const CREDENTIAL_TYPE_REGISTRY: Record<string, CredentialTypeDef> = {
       expectedStatus: 200,
     },
   },
+
+  // ── AI Model Providers ─────────────────────────────────────────────────
+
+  anthropic: {
+    type: "anthropic",
+    label: "Anthropic (Claude)",
+    description: "Use Claude models (Sonnet, Opus, Haiku) as the agent's AI brain",
+    icon: "Bot",
+    authMethod: "api_key",
+    fields: [
+      {
+        key: "apiKey",
+        label: "Anthropic API Key",
+        type: "password",
+        placeholder: "sk-ant-...",
+        required: true,
+        helpText: "Get your API key from console.anthropic.com",
+      },
+    ],
+    compatibleToolSets: [],
+    test: {
+      method: "GET",
+      url: "https://api.anthropic.com/v1/models",
+      headers: { "x-api-key": "{{apiKey}}", "anthropic-version": "2023-06-01" },
+      expectedStatus: 200,
+    },
+  },
+
+  google_ai: {
+    type: "google_ai",
+    label: "Google AI (Gemini)",
+    description: "Use Gemini models as the agent's AI brain",
+    icon: "Sparkles",
+    authMethod: "api_key",
+    fields: [
+      {
+        key: "apiKey",
+        label: "Google AI API Key",
+        type: "password",
+        placeholder: "AI...",
+        required: true,
+        helpText: "Get your API key from aistudio.google.com",
+      },
+    ],
+    compatibleToolSets: [],
+    test: {
+      method: "GET",
+      url: "https://generativelanguage.googleapis.com/v1beta/models?key={{apiKey}}",
+      expectedStatus: 200,
+    },
+  },
+
+  openai: {
+    type: "openai",
+    label: "OpenAI (GPT / o-series)",
+    description: "Use GPT-4o and o-series reasoning models as the agent's AI brain",
+    icon: "Cpu",
+    authMethod: "api_key",
+    fields: [
+      {
+        key: "apiKey",
+        label: "OpenAI API Key",
+        type: "password",
+        placeholder: "sk-...",
+        required: true,
+        helpText: "Get your API key from platform.openai.com",
+      },
+    ],
+    compatibleToolSets: [],
+    test: {
+      method: "GET",
+      url: "https://api.openai.com/v1/models",
+      headers: { Authorization: "Bearer {{apiKey}}" },
+      expectedStatus: 200,
+    },
+  },
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────

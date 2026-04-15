@@ -641,12 +641,49 @@ const ALL_MODELS = [
     provider: "Google",
     tier: "$$",
   },
+  {
+    id: "gpt-4o",
+    name: "GPT-4o",
+    description: "OpenAI flagship multimodal model",
+    provider: "OpenAI",
+    tier: "$$$",
+  },
+  {
+    id: "gpt-4o-mini",
+    name: "GPT-4o Mini",
+    description: "Fast and affordable OpenAI model",
+    provider: "OpenAI",
+    tier: "$",
+  },
+  {
+    id: "o4-mini",
+    name: "o4-mini",
+    description: "OpenAI fast reasoning model",
+    provider: "OpenAI",
+    tier: "$$",
+  },
 ];
 
 function EnabledModelsSection({ agent }: { agent: Doc<"agents"> }) {
   const updateAgent = useMutation(api.agents.update);
-  // If enabledModels is not set, all models are enabled by default
-  const enabledModels = agent.enabledModels ?? ALL_MODELS.map((m) => m.id);
+
+  // Filter models by AI provider credentials. If no credentials configured, show all.
+  const aiProviders = useQuery(api.credentials.listAiProviders);
+  const PROVIDER_TO_CRED: Record<string, string> = {
+    Anthropic: "anthropic",
+    Google: "google_ai",
+    OpenAI: "openai",
+  };
+  const availableModels = aiProviders && aiProviders.length > 0
+    ? ALL_MODELS.filter((m) => {
+        const credType = PROVIDER_TO_CRED[m.provider];
+        return credType ? aiProviders.includes(credType) : true;
+      })
+    : ALL_MODELS;
+
+  // If enabledModels is not set, all available models are enabled by default
+  const enabledModels = (agent.enabledModels ?? ALL_MODELS.map((m) => m.id))
+    .filter((id) => availableModels.some((m) => m.id === id));
 
   async function handleToggle(modelId: string) {
     const isCurrentModel = agent.model === modelId;
@@ -672,14 +709,17 @@ function EnabledModelsSection({ agent }: { agent: Doc<"agents"> }) {
         <Cpu className="h-4 w-4 text-zinc-400" />
         <h2 className="text-sm font-medium">Enabled Models</h2>
         <span className="text-xs text-zinc-600 ml-auto">
-          {enabledModels.length} of {ALL_MODELS.length}
+          {enabledModels.length} of {availableModels.length}
         </span>
       </div>
       <p className="text-xs text-zinc-500 mb-4">
         Choose which models appear in the chat model selector.
+        {aiProviders && aiProviders.length > 0 && availableModels.length < ALL_MODELS.length && (
+          <span className="block mt-1 text-zinc-600">Add AI provider credentials to unlock more models.</span>
+        )}
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-        {ALL_MODELS.map((m) => {
+        {availableModels.map((m) => {
           const enabled = enabledModels.includes(m.id);
           const isCurrentModel = agent.model === m.id;
           const cantDisable = enabled && (isCurrentModel || enabledModels.length <= 1);

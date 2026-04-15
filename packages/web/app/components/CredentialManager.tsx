@@ -3,8 +3,9 @@ import { api } from "@agent-maker/shared/convex/_generated/api";
 import {
   type CredentialTypeDef,
   credentialTypesForToolSet,
+  getCredentialTypeDef,
 } from "@agent-maker/shared/src/credential-types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Save,
   Loader2,
@@ -16,6 +17,8 @@ import {
   Zap,
   ExternalLink,
   ChevronDown,
+  Pencil,
+  RefreshCw,
 } from "lucide-react";
 import type { Doc, Id } from "@agent-maker/shared/convex/_generated/dataModel";
 
@@ -35,6 +38,7 @@ export function CredentialManager({ agent, toolSetName }: CredentialManagerProps
   const [selectedType, setSelectedType] = useState<string>(
     compatibleTypes[0]?.type ?? ""
   );
+  const [editingLinked, setEditingLinked] = useState(false);
 
   // Find current link for this tool set
   const currentLink = agentLinks?.find((l) => l.toolSetName === toolSetName);
@@ -58,8 +62,11 @@ export function CredentialManager({ agent, toolSetName }: CredentialManagerProps
 
   // If linked, show the linked credential info
   if (currentLink) {
+    const linkedTypeDef = getCredentialTypeDef(currentLink.credentialType);
+    const isOAuth = linkedTypeDef?.authMethod === "oauth2";
+    const canEdit = linkedTypeDef && !isOAuth;
     return (
-      <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4">
+      <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Link2 className="h-3.5 w-3.5 text-neon-400" />
@@ -68,6 +75,21 @@ export function CredentialManager({ agent, toolSetName }: CredentialManagerProps
           </div>
           <div className="flex items-center gap-2">
             <TestCredentialButton credentialId={currentLink.credentialId as Id<"credentials">} />
+            {isOAuth && linkedTypeDef && (
+              <InlineReconnectButton
+                typeDef={linkedTypeDef}
+                credentialId={currentLink.credentialId as Id<"credentials">}
+              />
+            )}
+            {canEdit && !editingLinked && (
+              <button
+                onClick={() => setEditingLinked(true)}
+                className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                <Pencil className="h-3 w-3" />
+                Edit
+              </button>
+            )}
             <button
               onClick={handleUnlink}
               className="flex items-center gap-1 text-xs text-zinc-500 hover:text-red-400 transition-colors"
@@ -77,6 +99,16 @@ export function CredentialManager({ agent, toolSetName }: CredentialManagerProps
             </button>
           </div>
         </div>
+        {editingLinked && linkedTypeDef && (
+          <div className="pt-2 border-t border-zinc-700/40">
+            <InlineEditForm
+              credentialId={currentLink.credentialId as Id<"credentials">}
+              currentName={currentLink.credentialName}
+              typeDef={linkedTypeDef}
+              onDone={() => setEditingLinked(false)}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -389,6 +421,179 @@ function TestCredentialButton({ credentialId }: { credentialId: Id<"credentials"
           {result.valid ? "Valid" : result.error ?? "Invalid"}
         </span>
       )}
+    </div>
+  );
+}
+
+// ── Inline Reconnect Button (for OAuth2 linked credentials) ──────────
+
+function InlineReconnectButton({
+  typeDef,
+  credentialId,
+}: {
+  typeDef: CredentialTypeDef;
+  credentialId: Id<"credentials">;
+}) {
+  const reconnectOAuth = useAction(api.credentialActions.reconnectOAuth);
+  const [loading, setLoading] = useState(false);
+
+  async function handleReconnect() {
+    if (!typeDef.oauth2) return;
+    setLoading(true);
+    try {
+      const { authUrl } = await reconnectOAuth({
+        provider: typeDef.type,
+        scopes: typeDef.oauth2.scopes,
+        credentialId,
+      });
+      window.location.href = authUrl;
+    } catch (err: any) {
+      alert(err.message);
+      setLoading(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={handleReconnect}
+      disabled={loading}
+      className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50"
+      title="Re-authorize to refresh Google tokens"
+    >
+      {loading ? (
+        <Loader2 className="h-3 w-3 animate-spin" />
+      ) : (
+        <RefreshCw className="h-3 w-3" />
+      )}
+      Reconnect
+    </button>
+  );
+}
+
+// ── Inline Edit Form (for linked credentials in agent settings) ───────
+
+function InlineEditForm({
+  credentialId,
+  currentName,
+  typeDef,
+  onDone,
+}: {
+  credentialId: Id<"credentials">;
+  currentName: string;
+  typeDef: CredentialTypeDef;
+  onDone: () => void;
+}) {
+  const updateCredential = useAction(api.credentialActions.update);
+  const getDecrypted = useAction(api.credentialActions.getDecryptedForUser);
+
+  const [name, setName] = useState(currentName);
+  const [fields, setFields] = useState<Record<string, string>>(() => {
+    const init: Record<string, string> = {};
+    for (const f of typeDef.fields) init[f.key] = "";
+    return init;
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await getDecrypted({ credentialId });
+        if (cancelled) return;
+        const init: Record<string, string> = {};
+        for (const f of typeDef.fields) init[f.key] = (data?.[f.key] ?? "") as string;
+        setFields(init);
+      } catch (err: any) {
+        if (!cancelled) setError(err.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [credentialId]);
+
+  const requiredFilled = typeDef.fields
+    .filter((f) => f.required)
+    .every((f) => fields[f.key]?.trim());
+
+  async function handleSave() {
+    if (!requiredFilled || !name.trim()) return;
+    setSaving(true);
+    try {
+      await updateCredential({
+        credentialId,
+        name: name.trim() !== currentName ? name.trim() : undefined,
+        data: fields,
+      });
+      onDone();
+    } catch (err: any) {
+      alert(err.message);
+    }
+    setSaving(false);
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-xs text-zinc-500 py-1">
+        <Loader2 className="h-3 w-3 animate-spin" /> Loading…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-1">
+        <p className="text-xs text-red-400">{error}</p>
+        <button onClick={onDone} className="text-xs text-zinc-500 hover:text-zinc-300">Close</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="block text-xs text-zinc-500 mb-1">Name</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none"
+        />
+      </div>
+      {typeDef.fields.map((field) => (
+        <div key={field.key}>
+          <label className="block text-xs text-zinc-500 mb-1">
+            {field.label}
+            {!field.required && <span className="text-zinc-600 ml-1">(optional)</span>}
+          </label>
+          <input
+            type={field.type === "password" ? "password" : "text"}
+            value={fields[field.key]}
+            onChange={(e) => setFields((prev) => ({ ...prev, [field.key]: e.target.value }))}
+            placeholder={field.placeholder}
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-mono placeholder:text-zinc-500 focus:border-zinc-500 focus:outline-none"
+          />
+          {field.helpText && (
+            <p className="text-[11px] text-zinc-600 mt-1">{field.helpText}</p>
+          )}
+        </div>
+      ))}
+      <div className="flex items-center gap-2 pt-1">
+        <button
+          onClick={handleSave}
+          disabled={saving || !requiredFilled || !name.trim()}
+          className="flex items-center gap-1.5 text-xs bg-zinc-100 text-zinc-900 px-3 py-1.5 rounded-lg font-medium hover:bg-zinc-200 disabled:opacity-50 transition-colors"
+        >
+          {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+          {saving ? "Saving…" : "Save"}
+        </button>
+        <button onClick={onDone} className="text-xs text-zinc-500 hover:text-zinc-300 px-2 py-1.5">
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

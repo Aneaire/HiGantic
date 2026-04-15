@@ -607,6 +607,7 @@ export default defineSchema({
     scopes: v.array(v.string()),
     createdAt: v.number(),
     expiresAt: v.number(),
+    credentialIdToUpdate: v.optional(v.id("credentials")),
   })
     .index("by_state", ["state"]),
 

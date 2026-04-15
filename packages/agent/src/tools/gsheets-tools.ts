@@ -1,4 +1,4 @@
-import { tool } from "@anthropic-ai/claude-agent-sdk";
+import { tool } from "../ai-sdk-shim.js";
 import { z } from "zod";
 import type { AgentConvexClient } from "../convex-client.js";
 
@@ -80,7 +80,7 @@ export function createGSheetsTools(
         const sheetNames = input.sheets ?? ["Sheet1"];
         const body: any = {
           properties: { title: input.title },
-          sheets: sheetNames.map((name) => ({
+          sheets: sheetNames.map((name: string) => ({
             properties: { title: name },
           })),
         };

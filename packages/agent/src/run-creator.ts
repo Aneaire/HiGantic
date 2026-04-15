@@ -1,8 +1,7 @@
-import { query } from "@anthropic-ai/claude-agent-sdk";
-import { createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
-import { existsSync, mkdirSync } from "fs";
+import type { CoreMessage, Tool } from "ai";
 import { CreatorConvexClient } from "./creator-convex-client.js";
 import { createCreatorTools } from "./tools/creator-tools.js";
+import { runWithAiSdk } from "./run-with-ai-sdk.js";
 
 export interface RunCreatorParams {
   agentId: string;
@@ -130,9 +129,9 @@ Walk through these steps naturally (adapt to the user):
    - \`claude-sonnet-4-6\` — Best balance of speed and capability (recommended for most)
    - \`claude-opus-4-6\` — Most capable Claude, best for complex reasoning
    - \`claude-haiku-4-5-20251001\` — Fastest and cheapest Claude, good for simple tasks
-   - `gemini-3.1-pro-preview` — Most capable Gemini, advanced reasoning with 1M context
-   - `gemini-3-flash-preview` — Fast Gemini, great for agentic and multimodal tasks
-   - \`gemini-2.5-flash\` — Balanced Gemini, good all-rounder
+   - \`gemini-2.5-pro\` — Most capable Gemini, advanced reasoning with 1M context
+   - \`gemini-2.5-flash\` — Balanced Gemini, good all-rounder and fast
+   - \`gpt-4o\` — OpenAI's flagship model, great for general use
 6. **Starter Pages** — Offer to create initial pages (task boards, notes, spreadsheets, API pages) that will be ready when they start using the agent
 6b. **API Endpoints** (if applicable) — If the user wants to expose their agent as an API or integrate with external systems, create the necessary data pages FIRST (spreadsheets, tasks, notes), then create an API page, then set up endpoints using \`create_api_endpoints\`.
 7. **Icon** — Let them know they can upload a custom icon from the preview panel on the right
@@ -235,174 +234,59 @@ export async function runCreator(params: RunCreatorParams) {
   const flusher = new StreamFlusher(convexClient, params.assistantMessageId);
 
   try {
-    await convexClient.updateMessage(
-      params.assistantMessageId,
-      "",
-      "processing"
-    );
+    await convexClient.updateMessage(params.assistantMessageId, "", "processing");
 
-    // Load conversation history
     const allMessages = await convexClient.listMessages(params.conversationId);
 
     const apiMessages = allMessages
       .filter(
-        (m: any) =>
-          m._id !== params.assistantMessageId && m.content?.trim()
+        (m: any) => m._id !== params.assistantMessageId && m.content?.trim()
       )
       .map((m: any) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
       }));
 
-    // Extract the latest user message as the prompt
-    const latestUserMsg = [...apiMessages]
-      .reverse()
-      .find((m) => m.role === "user");
+    const latestUserMsg = [...apiMessages].reverse().find((m) => m.role === "user");
     const prompt = latestUserMsg?.content ?? "";
 
-    // Build conversation history for system prompt
     const historyMessages = apiMessages.slice(0, -1);
     const conversationHistorySection =
       historyMessages.length > 0
-        ? `\n\n## Conversation So Far\n${historyMessages.map((m) => `<${m.role}>\n${m.content}\n</${m.role}>`).join("\n\n")}\n\nContinue from where you left off. The user's latest message is provided as the prompt.`
+        ? `\n\n## Conversation So Far\n${historyMessages
+            .map((m) => `<${m.role}>\n${m.content}\n</${m.role}>`)
+            .join("\n\n")}\n\nContinue from where you left off. The user's latest message is provided as the prompt.`
         : "";
 
-    // Get user plan info and session mode
     const planInfo = await convexClient.getUserPlan(params.agentId);
     const userPlan = planInfo?.plan ?? "free";
     const sessionMode = await convexClient.getSessionMode(params.conversationId);
 
-    // Build MCP server with creator tools
-    const tools = createCreatorTools(convexClient, params.agentId, userPlan, params.assistantMessageId);
-    const mcpServer = createSdkMcpServer({
-      name: "creator-tools",
-      version: "1.0.0",
-      tools,
-    });
-
-    const allowedTools = [
-      "mcp__creator-tools__update_agent_config",
-      "mcp__creator-tools__preview_config",
-      "mcp__creator-tools__list_tool_sets",
-      "mcp__creator-tools__use_template",
-      "mcp__creator-tools__create_starter_pages",
-      "mcp__creator-tools__create_api_endpoints",
-      "mcp__creator-tools__finalize_agent",
-      "mcp__creator-tools__suggest_replies",
-      "mcp__creator-tools__ask_questions",
-    ];
-
-    const systemPrompt = sessionMode === "edit"
-      ? EDITOR_SYSTEM_PROMPT
-      : CREATOR_SYSTEM_PROMPT;
-
-    const agentCwd = `/tmp/creator-workspace`;
-    if (!existsSync(agentCwd)) {
-      mkdirSync(agentCwd, { recursive: true });
-    }
-
-    console.log(
-      `[creator] Starting creator run for agent=${params.agentId}`
+    // Build creator tools into a flat Record<string, Tool>
+    const toolArray = createCreatorTools(
+      convexClient,
+      params.agentId,
+      userPlan,
+      params.assistantMessageId
     );
+    const tools: Record<string, Tool<any, any>> = Object.assign({}, ...toolArray);
 
-    let responseText = "";
-    let lastTurnHadToolUse = false;
+    const systemPrompt =
+      (sessionMode === "edit" ? EDITOR_SYSTEM_PROMPT : CREATOR_SYSTEM_PROMPT) +
+      conversationHistorySection;
 
-    const agentStream = query({
-      prompt,
-      options: {
-        systemPrompt: systemPrompt + conversationHistorySection,
-        cwd: agentCwd,
-        mcpServers: { "creator-tools": mcpServer },
-        allowedTools,
-        permissionMode: "bypassPermissions",
-        allowDangerouslySkipPermissions: true,
-        includePartialMessages: true,
-        maxTurns: 10,
-        model: "claude-sonnet-4-6",
-        stderr: (data: string) => {
-          console.error("[creator] CLI stderr:", data);
-        },
-      },
+    console.log(`[creator] Starting creator run for agent=${params.agentId}`);
+
+    const messages: CoreMessage[] = [{ role: "user", content: prompt }];
+
+    await runWithAiSdk({
+      flusher,
+      modelId: "claude-sonnet-4-6",
+      system: systemPrompt,
+      messages,
+      tools,
+      maxSteps: 10,
     });
-
-    for await (const message of agentStream) {
-      if (flusher.stopped) break;
-
-      if (message.type === "stream_event") {
-        const event = (message as any).event;
-        if (!event) continue;
-        if (event.type === "content_block_delta" && event.delta) {
-          if (event.delta.type === "text_delta" && event.delta.text) {
-            if (lastTurnHadToolUse && responseText.length > 0) {
-              responseText += "\n\n";
-              flusher.appendText("\n\n");
-              lastTurnHadToolUse = false;
-            }
-            responseText += event.delta.text;
-            flusher.appendText(event.delta.text);
-          }
-        }
-      } else if (message.type === "assistant" && message.message?.content) {
-        let fullText = "";
-        for (const block of message.message.content) {
-          if ("text" in block && block.text) {
-            fullText += block.text;
-          } else if ("name" in block && block.name) {
-            const cleanName = block.name.replace(
-              /^mcp__creator-tools__/,
-              ""
-            );
-            lastTurnHadToolUse = true;
-            flusher.upsertToolCall({
-              id: block.id ?? `tool_${Date.now()}`,
-              name: cleanName,
-              input: JSON.stringify("input" in block ? block.input : {}),
-            });
-          }
-        }
-        if (fullText && !responseText.endsWith(fullText)) {
-          if (flusher.currentText.length >= fullText.length) {
-            responseText = flusher.currentText;
-          } else if (responseText.length >= fullText.length) {
-            responseText =
-              responseText.substring(0, responseText.length - fullText.length) +
-              fullText;
-          } else {
-            responseText = fullText;
-          }
-          flusher.setText(responseText);
-        }
-      } else if (message.type === "user" && message.message?.content) {
-        const content = message.message.content;
-        if (Array.isArray(content)) {
-          for (const block of content) {
-            if (block.type === "tool_result" && block.tool_use_id) {
-              const existing = flusher.currentToolCalls.find(
-                (t) => t.id === block.tool_use_id
-              );
-              if (existing) {
-                let output: string | undefined;
-                if (typeof block.content === "string") {
-                  output = block.content;
-                } else if (Array.isArray(block.content)) {
-                  output = block.content
-                    .filter((b: any) => b.type === "text")
-                    .map((b: any) => b.text)
-                    .join("\n");
-                }
-                flusher.upsertToolCall({ ...existing, output });
-              }
-            }
-          }
-        }
-      } else if (message.type === "result") {
-        if (!responseText && (message as any).subtype === "success") {
-          responseText = (message as any).result ?? "";
-          flusher.setText(responseText);
-        }
-      }
-    }
 
     if (!flusher.stopped) {
       await flusher.flushFinal("done");

@@ -46,6 +46,14 @@ function NanoBananaIcon({ className }: { className?: string }) {
   );
 }
 
+function OpenAIIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
+      <path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0L4.1 14.11A4.5 4.5 0 0 1 2.34 7.896zm16.597 3.855l-5.833-3.387L15.119 7.2a.076.076 0 0 1 .071 0l4.724 2.727a4.5 4.5 0 0 1-.679 8.122V12.48a.79.79 0 0 0-.398-.729zm2.0-3.293l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 8.959V6.63a.07.07 0 0 1 .028-.061L14.17 3.86a4.492 4.492 0 0 1 6.67 4.653zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.81a4.492 4.492 0 0 1 7.375-3.453l-.142.08L8.704 6.196a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z"/>
+    </svg>
+  );
+}
+
 // ── Model data ──────────────────────────────────────────────────────────
 
 type ModelCapability = "vision" | "thinking";
@@ -54,7 +62,7 @@ interface ModelEntry {
   value: string;
   label: string;
   description: string;
-  group: "Claude" | "Gemini";
+  group: "Claude" | "Gemini" | "OpenAI";
   tier: string;
   capabilities: ModelCapability[];
   type: "chat";
@@ -92,6 +100,21 @@ const CHAT_MODELS: ModelEntry[] = [
     description: "Balanced Gemini model",
     group: "Gemini", tier: "$$", capabilities: ["vision", "thinking"], type: "chat",
   },
+  {
+    value: "gpt-4o", label: "GPT-4o",
+    description: "OpenAI flagship multimodal model",
+    group: "OpenAI", tier: "$$$", capabilities: ["vision"], type: "chat",
+  },
+  {
+    value: "gpt-4o-mini", label: "GPT-4o Mini",
+    description: "Fast and affordable OpenAI model",
+    group: "OpenAI", tier: "$", capabilities: ["vision"], type: "chat",
+  },
+  {
+    value: "o4-mini", label: "o4-mini",
+    description: "OpenAI fast reasoning model",
+    group: "OpenAI", tier: "$$", capabilities: ["thinking"], type: "chat",
+  },
 ];
 
 
@@ -102,8 +125,9 @@ function getModelLabel(value: string) {
 function getProviderIcon(group: string) {
   if (group === "Claude") return AnthropicIcon;
   if (group === "Gemini") return GoogleIcon;
+  if (group === "OpenAI") return OpenAIIcon;
   if (group === "Nano Banana") return NanoBananaIcon;
-  return GoogleIcon;
+  return AnthropicIcon;
 }
 
 function TierBadge({ tier }: { tier: string }) {
@@ -151,7 +175,7 @@ function ModelDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "Claude" | "Gemini">("all");
+  const [filter, setFilter] = useState<"all" | "Claude" | "Gemini" | "OpenAI">("all");
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const close = useCallback(() => {
@@ -206,6 +230,7 @@ function ModelDropdown({
     { key: "all", label: "All", icon: Sparkles },
     { key: "Claude", label: "Claude", icon: AnthropicIcon },
     { key: "Gemini", label: "Gemini", icon: GoogleIcon },
+    { key: "OpenAI", label: "OpenAI", icon: OpenAIIcon },
   ];
 
   return (
@@ -433,6 +458,32 @@ export function ChatInput({
   const [dragOver, setDragOver] = useState(false);
   const generateUploadUrl = useMutation(api.storage.generateUploadUrl);
 
+  // Credential-based model filtering: only show models for providers the user has credentials for.
+  // If no AI provider credentials are configured, show all models (backward-compatible).
+  const aiProviders = useQuery(api.credentials.listAiProviders);
+  const credentialFilteredModels = useMemo(() => {
+    if (!aiProviders || aiProviders.length === 0) return undefined; // no filter — show all
+    const GROUP_TO_CRED: Record<string, string> = {
+      Claude: "anthropic",
+      Gemini: "google_ai",
+      OpenAI: "openai",
+    };
+    return CHAT_MODELS
+      .filter((m) => {
+        const credType = GROUP_TO_CRED[m.group];
+        return credType ? aiProviders.includes(credType) : true;
+      })
+      .map((m) => m.value);
+  }, [aiProviders]);
+
+  // Merge agent-level enabledModels with credential-level filtering
+  const effectiveEnabledModels = useMemo(() => {
+    if (!credentialFilteredModels && !enabledModels) return undefined;
+    const base = enabledModels ?? CHAT_MODELS.map((m) => m.value);
+    if (!credentialFilteredModels) return base;
+    return base.filter((v) => credentialFilteredModels.includes(v));
+  }, [enabledModels, credentialFilteredModels]);
+
   async function uploadFile(file: File): Promise<PendingAttachment | null> {
     if (!ACCEPTED_TYPES.includes(file.type)) {
       console.warn(`Unsupported file type: ${file.type}`);
@@ -659,7 +710,7 @@ export function ChatInput({
                   model={model}
                   onModelChange={onModelChange}
                   disabled={isProcessing}
-                  enabledModels={enabledModels}
+                  enabledModels={effectiveEnabledModels}
                 />
               ) : (
                 <div />

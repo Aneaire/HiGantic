@@ -1,4 +1,4 @@
-import { tool } from "@anthropic-ai/claude-agent-sdk";
+import { tool } from "../ai-sdk-shim.js";
 import { z } from "zod";
 import type { AgentConvexClient } from "../convex-client.js";
 
@@ -233,7 +233,7 @@ export function createGCalTools(
         if (input.description) event.description = input.description;
         if (input.location) event.location = input.location;
         if (input.attendees) {
-          event.attendees = input.attendees.map((email) => ({ email }));
+          event.attendees = input.attendees.map((email: string) => ({ email }));
         }
         if (input.add_meet) {
           event.conferenceData = {
@@ -335,7 +335,7 @@ export function createGCalTools(
             : { dateTime: input.end, timeZone: input.timezone };
         }
         if (input.attendees) {
-          patch.attendees = input.attendees.map((email) => ({ email }));
+          patch.attendees = input.attendees.map((email: string) => ({ email }));
         }
 
         const updated = await gcalFetch(
@@ -447,7 +447,7 @@ export function createGCalTools(
         const data = await gcalFetch(gcalConfig, "/freeBusy", "POST", {
           timeMin: input.time_min,
           timeMax: input.time_max,
-          items: calendarIds.map((id) => ({ id })),
+          items: calendarIds.map((id: string) => ({ id })),
         });
 
         const result: Record<string, any> = {};

@@ -1,4 +1,4 @@
-import { tool } from "@anthropic-ai/claude-agent-sdk";
+import { tool } from "../ai-sdk-shim.js";
 import { z } from "zod";
 import type { AgentConvexClient } from "../convex-client.js";
 

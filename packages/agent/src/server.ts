@@ -10,8 +10,7 @@ import { processDocument } from "./document-processor.js";
 import { AgentConvexClient } from "./convex-client.js";
 import { DiscordGatewayManager } from "./discord-gateway-manager.js";
 import { SlackGatewayManager } from "./slack-gateway-manager.js";
-import { query } from "@anthropic-ai/claude-agent-sdk";
-import { existsSync, mkdirSync } from "fs";
+import { generateOnce } from "./run-with-ai-sdk.js";
 
 // ── Automation types ──────────────────────────────────────────────────
 
@@ -312,15 +311,24 @@ app.get("/oauth/callback", async (c) => {
     };
     const { encrypted, iv } = encrypt(JSON.stringify(tokenData));
 
-    // Store as a new credential
-    await convex.mutation(api.credentials.insertCredentialFromOAuth, {
-      serverToken: SERVER_TOKEN,
-      userId: oauthState.userId,
-      name: `Google (${new Date().toLocaleDateString()})`,
-      type: oauthState.provider,
-      encryptedData: encrypted,
-      iv,
-    });
+    // Update existing credential (reconnect) or insert new one
+    if (oauthState.credentialIdToUpdate) {
+      await convex.mutation(api.credentials.updateCredentialFromOAuth, {
+        serverToken: SERVER_TOKEN,
+        credentialId: oauthState.credentialIdToUpdate,
+        encryptedData: encrypted,
+        iv,
+      });
+    } else {
+      await convex.mutation(api.credentials.insertCredentialFromOAuth, {
+        serverToken: SERVER_TOKEN,
+        userId: oauthState.userId,
+        name: `Google (${new Date().toLocaleDateString()})`,
+        type: oauthState.provider,
+        encryptedData: encrypted,
+        iv,
+      });
+    }
 
     // Clean up state
     await convex.mutation(api.credentials.deleteOAuthState, {
@@ -465,42 +473,7 @@ User's request: ${instruction}
 
 Return the system prompt.`;
 
-    const cwd = "/tmp/assist-prompt-workspace";
-    if (!existsSync(cwd)) mkdirSync(cwd, { recursive: true });
-
-    let result = "";
-    const stream = query({
-      prompt: userMessage,
-      options: {
-        systemPrompt,
-        cwd,
-        maxTurns: 1,
-        model: "claude-sonnet-4-6",
-        permissionMode: "bypassPermissions",
-        allowDangerouslySkipPermissions: true,
-        includePartialMessages: true,
-      },
-    });
-
-    for await (const message of stream) {
-      if (message.type === "stream_event") {
-        const ev = (message as any).event;
-        if (ev?.type === "content_block_delta" && ev.delta?.type === "text_delta" && ev.delta.text) {
-          result += ev.delta.text;
-        }
-      } else if (message.type === "assistant" && message.message?.content) {
-        // Final assistant message — extract full text
-        let fullText = "";
-        for (const block of message.message.content) {
-          if ("text" in block && block.text) {
-            fullText += block.text;
-          }
-        }
-        if (fullText) {
-          result = fullText;
-        }
-      }
-    }
+    const result = await generateOnce("claude-sonnet-4-6", systemPrompt, userMessage);
 
     return c.json({ prompt: result.trim() });
   } catch (err: any) {

@@ -1,4 +1,4 @@
-import { tool } from "@anthropic-ai/claude-agent-sdk";
+import { tool } from "../ai-sdk-shim.js";
 import { z } from "zod";
 import type { AgentConvexClient } from "../convex-client.js";
 
@@ -481,7 +481,7 @@ export function createNotionTools(
     },
     async (input) => {
       try {
-        const children = input.blocks.map((block) => {
+        const children = input.blocks.map((block: any) => {
           if (block.type === "divider") {
             return { object: "block", type: "divider", divider: {} };
           }
