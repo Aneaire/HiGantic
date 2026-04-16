@@ -165,8 +165,20 @@ export const startEdit = mutation({
 
     for (const session of activeSessions) {
       if (session.status === "active") {
-        // Mark as abandoned but preserve conversation history for edit sessions
         await ctx.db.patch(session._id, { status: "abandoned" });
+        // Clean up create-mode session conversations so they don't bleed into the editor history
+        if (session.mode !== "edit" && session.conversationId) {
+          const messages = await ctx.db
+            .query("messages")
+            .withIndex("by_conversation", (q) =>
+              q.eq("conversationId", session.conversationId!)
+            )
+            .collect();
+          for (const msg of messages) {
+            await ctx.db.delete(msg._id);
+          }
+          await ctx.db.delete(session.conversationId);
+        }
       }
     }
 
