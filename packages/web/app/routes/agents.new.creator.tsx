@@ -7,8 +7,15 @@ import { ChatInput } from "~/components/ChatInput";
 import { ChevronLeft, Loader2, Upload } from "lucide-react";
 import type { Id } from "@agent-maker/shared/convex/_generated/dataModel";
 import { getToolSetLabelsMap } from "@agent-maker/shared/src/tool-set-registry";
+import { CHAT_MODELS } from "~/components/ModelDropdown";
 
 const TOOL_LABELS = getToolSetLabelsMap();
+
+const PROVIDER_TO_CRED: Record<string, string> = {
+  Claude: "anthropic",
+  Gemini: "google_ai",
+  OpenAI: "openai",
+};
 
 export default function AgentCreatorPage() {
   const navigate = useNavigate();
@@ -78,6 +85,17 @@ function CreatorView({
   const messages = useQuery(api.messages.list, { conversationId });
   const sendMessage = useMutation(api.messages.send);
   const stopMessage = useMutation(api.messages.stop);
+  const setCreatorModel = useMutation(api.creatorSessions.setCreatorModel);
+  const aiProviders = useQuery(api.credentials.listAiProviders);
+
+  const creatorModel = (session as any)?.creatorModel ?? "claude-sonnet-4-6";
+  const enabledModels =
+    aiProviders && aiProviders.length > 0
+      ? CHAT_MODELS.filter((m) => {
+          const cred = PROVIDER_TO_CRED[m.group];
+          return cred ? aiProviders.includes(cred) : true;
+        }).map((m) => m.value)
+      : undefined;
 
   useEffect(() => {
     if (agent && agent.status === "active") {
@@ -156,6 +174,10 @@ function CreatorView({
               last?.questions?.length
             );
           })()}
+          model={creatorModel}
+          onModelChange={(model) => setCreatorModel({ sessionId, model })}
+          enabledModels={enabledModels}
+          lockModelDuringProcessing={false}
         />
       </div>
 
@@ -203,6 +225,7 @@ function CreatorView({
     </div>
   );
 }
+
 
 function IconUpload({
   agentId,

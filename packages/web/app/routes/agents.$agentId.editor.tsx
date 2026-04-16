@@ -15,12 +15,22 @@ import {
   XCircle,
   Clock,
   X,
+  Maximize2,
 } from "lucide-react";
 import { Link } from "react-router";
 import type { Id } from "@agent-maker/shared/convex/_generated/dataModel";
 import { getToolSetLabelsMap } from "@agent-maker/shared/src/tool-set-registry";
+import { CHAT_MODELS } from "~/components/ModelDropdown";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 const TOOL_LABELS = getToolSetLabelsMap();
+
+const PROVIDER_TO_CRED: Record<string, string> = {
+  Claude: "anthropic",
+  Gemini: "google_ai",
+  OpenAI: "openai",
+};
 
 export default function AgentEditorPage() {
   const { agentId } = useParams();
@@ -94,8 +104,19 @@ function EditorView({
   const sendMessage = useMutation(api.messages.send);
   const stopMessage = useMutation(api.messages.stop);
   const createConversation = useMutation(api.conversations.create);
+  const setCreatorModel = useMutation(api.creatorSessions.setCreatorModel);
+  const aiProviders = useQuery(api.credentials.listAiProviders);
   const pastSessions = useQuery(api.creatorSessions.listByAgent, { agentId });
   const [creatingChat, setCreatingChat] = useState(false);
+
+  const creatorModel = (session as any)?.creatorModel ?? "claude-sonnet-4-6";
+  const enabledModels =
+    aiProviders && aiProviders.length > 0
+      ? CHAT_MODELS.filter((m) => {
+          const cred = PROVIDER_TO_CRED[m.group];
+          return cred ? aiProviders.includes(cred) : true;
+        }).map((m) => m.value)
+      : undefined;
 
   const [showHistory, setShowHistory] = useState(
     typeof window !== "undefined" && window.innerWidth >= 1024
@@ -142,6 +163,15 @@ function EditorView({
   }
 
   const config = (session?.partialConfig as any) ?? {};
+  const [systemPromptOpen, setSystemPromptOpen] = useState(false);
+  const [editingPrompt, setEditingPrompt] = useState<string | null>(null);
+
+  function handlePromptSave() {
+    if (editingPrompt === null) return;
+    handleSend(`Please update the system prompt to:\n\n${editingPrompt}`);
+    setEditingPrompt(null);
+    setSystemPromptOpen(false);
+  }
 
   return (
     <div className="flex h-screen bg-surface">
@@ -241,6 +271,10 @@ function EditorView({
             const last = messages?.[messages.length - 1];
             return !!(last?.role === "assistant" && last?.status === "done" && last?.questions?.length);
           })()}
+          model={creatorModel}
+          onModelChange={(model) => setCreatorModel({ sessionId, model })}
+          enabledModels={enabledModels}
+          lockModelDuringProcessing={false}
         />
       </div>
 
@@ -302,15 +336,42 @@ function EditorView({
               <p className="eyebrow mb-2">System Prompt</p>
               {config.systemPrompt &&
               config.systemPrompt !== "You are a helpful AI assistant." ? (
-                <pre className="font-mono text-2xs text-ink-muted whitespace-pre-wrap bg-surface-sunken border border-rule p-3 max-h-64 overflow-y-auto leading-relaxed">
-                  {config.systemPrompt}
-                </pre>
+                <button
+                  onClick={() => setSystemPromptOpen(true)}
+                  className="group w-full text-left relative"
+                >
+                  <pre className="font-mono text-2xs text-ink-muted whitespace-pre-wrap bg-surface-sunken border border-rule p-3 max-h-40 overflow-hidden leading-relaxed transition-colors group-hover:border-zinc-600">
+                    {config.systemPrompt}
+                  </pre>
+                  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-surface-sunken/80 flex items-end justify-center pb-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="inline-flex items-center gap-1 text-2xs uppercase tracking-[0.1em] font-semibold text-ink-muted bg-surface-sunken border border-rule px-2 py-1">
+                      <Maximize2 className="h-2.5 w-2.5" strokeWidth={1.75} />
+                      View / Edit
+                    </span>
+                  </div>
+                </button>
               ) : (
-                <p className="text-sm text-ink-faint italic">Not set</p>
+                <button
+                  onClick={() => setSystemPromptOpen(true)}
+                  className="text-sm text-ink-faint italic hover:text-ink-muted transition-colors"
+                >
+                  Not set — click to add
+                </button>
               )}
             </div>
           </div>
         </aside>
+      )}
+
+      {/* System Prompt Dialog */}
+      {systemPromptOpen && (
+        <SystemPromptDialog
+          prompt={config.systemPrompt ?? ""}
+          editing={editingPrompt}
+          onEdit={setEditingPrompt}
+          onSave={handlePromptSave}
+          onClose={() => { setSystemPromptOpen(false); setEditingPrompt(null); }}
+        />
       )}
     </div>
   );
@@ -485,6 +546,102 @@ function PastConversationViewer({
       ) : (
         <ChatMessageList messages={messages} />
       )}
+    </div>
+  );
+}
+
+// ── System Prompt Dialog ──────────────────────────────────────────────
+
+function SystemPromptDialog({
+  prompt,
+  editing,
+  onEdit,
+  onSave,
+  onClose,
+}: {
+  prompt: string;
+  editing: string | null;
+  onEdit: (v: string | null) => void;
+  onSave: () => void;
+  onClose: () => void;
+}) {
+  const isEditing = editing !== null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-surface-inverse/50 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="w-full max-w-2xl h-[70vh] flex flex-col bg-surface-raised border border-rule shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 h-12 border-b border-rule shrink-0">
+          <p className="eyebrow">System Prompt</p>
+          <div className="flex items-center gap-2">
+            {isEditing ? (
+              <>
+                <button
+                  onClick={() => onEdit(null)}
+                  className="text-xs text-ink-muted hover:text-ink transition-colors px-3 py-1"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={onSave}
+                  className="text-xs bg-ink text-ink-inverse px-4 py-1.5 font-semibold hover:opacity-80 transition-all"
+                >
+                  Send to editor
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => onEdit(prompt)}
+                  className="inline-flex items-center gap-1.5 text-2xs uppercase tracking-[0.1em] font-semibold text-ink-muted hover:text-ink transition-colors px-2 py-1"
+                >
+                  <Pencil className="h-3 w-3" strokeWidth={1.5} />
+                  Edit
+                </button>
+                <button
+                  onClick={onClose}
+                  className="p-1 text-ink-faint hover:text-ink transition-colors"
+                >
+                  <X className="h-4 w-4" strokeWidth={1.5} />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-5 min-h-0">
+          {isEditing ? (
+            <textarea
+              autoFocus
+              value={editing}
+              onChange={(e) => onEdit(e.target.value)}
+              className="w-full h-full min-h-[320px] font-mono text-sm text-ink bg-transparent focus:outline-none resize-none leading-relaxed placeholder:text-ink-faint"
+              placeholder="Enter system prompt…"
+            />
+          ) : prompt ? (
+            <div className="prose max-w-none text-sm leading-relaxed
+              text-ink
+              prose-headings:text-ink prose-headings:font-semibold prose-headings:my-3
+              prose-h1:text-base prose-h2:text-sm prose-h3:text-sm
+              prose-p:text-ink prose-p:my-2
+              prose-li:text-ink prose-li:my-0.5 prose-ul:my-2 prose-ol:my-2
+              prose-strong:text-ink prose-strong:font-semibold
+              prose-code:text-accent prose-code:font-medium prose-code:before:content-none prose-code:after:content-none
+              prose-pre:bg-surface-sunken prose-pre:border prose-pre:border-rule prose-pre:text-xs
+              prose-blockquote:text-ink-muted prose-blockquote:border-rule
+              prose-a:text-accent prose-a:no-underline hover:prose-a:underline
+              prose-hr:border-rule">
+              <Markdown remarkPlugins={[remarkGfm]}>{prompt}</Markdown>
+            </div>
+          ) : (
+            <p className="text-sm text-ink-faint italic">No system prompt set.</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
