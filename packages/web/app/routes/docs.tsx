@@ -69,11 +69,6 @@ const SECTIONS: DocSection[] = [
       { id: "email", title: "Email", content: <EmailContent /> },
       { id: "rag", title: "Knowledge Base (RAG)", content: <RagContent /> },
       {
-        id: "custom-http",
-        title: "Custom HTTP Tools",
-        content: <CustomHttpContent />,
-      },
-      {
         id: "schedules",
         title: "Scheduled Actions",
         content: <SchedulesContent />,
@@ -141,6 +136,11 @@ const SECTIONS: DocSection[] = [
         id: "google-sheets",
         title: "Google Sheets",
         content: <GSheetsContent />,
+      },
+      {
+        id: "custom-http",
+        title: "Custom HTTP Tools",
+        content: <CustomHttpContent />,
       },
     ],
   },
@@ -769,7 +769,71 @@ function CustomHttpContent() {
       <DocH2>Setup</DocH2>
       <DocP>In your agent's <strong className="text-ink">Settings</strong> under <strong className="text-ink">Custom HTTP Tools</strong>, click Add Tool. Configure name, method, endpoint URL, headers, and input schema.</DocP>
 
-      <DocH2>Example: Slack</DocH2>
+      <DocH2>Free Sample APIs (No Auth Required)</DocH2>
+      <DocP>Paste any of these directly into the tool creator to try it out — all are free, public, and require no API key.</DocP>
+
+      <DocH3>1. Open-Meteo — Weather Forecast</DocH3>
+      <DocP>Get current weather for any location by latitude and longitude.</DocP>
+      <DocCode>{`Name: get_weather
+Method: GET
+Endpoint: https://api.open-meteo.com/v1/forecast
+Description: Get current weather for a location by coordinates
+Input Schema: {
+  "latitude": { "type": "number", "description": "Latitude, e.g. 40.71" },
+  "longitude": { "type": "number", "description": "Longitude, e.g. -74.01" },
+  "current": { "type": "string", "description": "Comma-separated fields, e.g. temperature_2m,wind_speed_10m" }
+}`}</DocCode>
+
+      <DocH3>2. REST Countries — Country Info</DocH3>
+      <DocP>Look up population, capital, currencies, languages, and flags by country name.</DocP>
+      <DocCode>{`Name: get_country_info
+Method: GET
+Endpoint: https://restcountries.com/v3.1/name/{name}
+Description: Get details about a country by its common name
+Input Schema: {
+  "name": { "type": "string", "description": "Country name, e.g. 'philippines'" }
+}`}</DocCode>
+
+      <DocH3>3. JokeAPI — Random Jokes</DocH3>
+      <DocP>Fetch a random joke. Filter by category (Programming, Misc, Dark, Pun, Spooky, Christmas).</DocP>
+      <DocCode>{`Name: get_joke
+Method: GET
+Endpoint: https://v2.jokeapi.dev/joke/{category}
+Description: Get a random joke from a category
+Input Schema: {
+  "category": { "type": "string", "description": "Any, Programming, Misc, Pun, Spooky, Christmas" }
+}`}</DocCode>
+
+      <DocH3>4. Cat Facts — Random Cat Trivia</DocH3>
+      <DocP>Get a random fact about cats. No parameters needed.</DocP>
+      <DocCode>{`Name: get_cat_fact
+Method: GET
+Endpoint: https://catfact.ninja/fact
+Description: Get a random cat fact
+Input Schema: {}`}</DocCode>
+
+      <DocH3>5. Cataas — Cat Image URL</DocH3>
+      <DocP>Returns a random cat image. Add <code className="text-ink bg-surface-sunken px-1">?json=true</code> for a JSON response with the image URL.</DocP>
+      <DocCode>{`Name: get_cat_image
+Method: GET
+Endpoint: https://cataas.com/cat?json=true
+Description: Get a random cat image URL
+Input Schema: {}`}</DocCode>
+
+      <DocH3>6. JSONPlaceholder — Fake REST API</DocH3>
+      <DocP>Classic sandbox for testing POST/GET flows. Returns fake posts, users, comments.</DocP>
+      <DocCode>{`Name: create_test_post
+Method: POST
+Endpoint: https://jsonplaceholder.typicode.com/posts
+Headers: { "Content-Type": "application/json" }
+Description: Create a fake blog post (sandbox for testing)
+Input Schema: {
+  "title": { "type": "string", "description": "Post title" },
+  "body": { "type": "string", "description": "Post body text" },
+  "userId": { "type": "number", "description": "User ID, e.g. 1" }
+}`}</DocCode>
+
+      <DocH2>Example With Auth: Slack Webhook</DocH2>
       <DocCode>{`Name: send_slack_message
 Method: POST
 Endpoint: https://hooks.slack.com/services/YOUR/WEBHOOK/URL

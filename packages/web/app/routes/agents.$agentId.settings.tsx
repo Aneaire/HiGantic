@@ -19,9 +19,11 @@ import {
   RotateCcw,
   Check,
   Cpu,
+  Pencil,
 } from "lucide-react";
 import { Link } from "react-router";
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import type { Doc } from "@agent-maker/shared/convex/_generated/dataModel";
 import { CredentialManager } from "~/components/CredentialManager";
 import { TOOL_SETS_REQUIRING_CREDENTIALS } from "@agent-maker/shared/src/credential-types";
@@ -1331,33 +1333,604 @@ function SlackBotSection({ agent }: { agent: Doc<"agents"> }) {
 
 // ── Custom Tools ─────────────────────────────────────────────────────
 
+type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+type AuthType = "none" | "bearer" | "basic" | "header" | "query";
+type BodyType = "json" | "form-data" | "url-encoded" | "raw";
+type ResponseFormat = "auto" | "json" | "text";
+type PaginationMode = "none" | "next_url" | "offset";
+type ToolTab = "basic" | "auth" | "body" | "params" | "pagination" | "response" | "options";
+
+interface KVEntry { name: string; value: string }
+
+interface ToolFormState {
+  name: string;
+  description: string;
+  endpoint: string;
+  method: HttpMethod;
+  // Auth
+  authType: AuthType;
+  authToken: string;
+  authUsername: string;
+  authPassword: string;
+  authHeaderName: string;
+  authHeaderValue: string;
+  authQueryName: string;
+  authQueryValue: string;
+  // Body
+  bodyType: BodyType;
+  rawBody: string;
+  // Params & Headers
+  queryParams: KVEntry[];
+  headers: KVEntry[];
+  // Pagination
+  paginationMode: PaginationMode;
+  paginationNextUrlPath: string;
+  paginationParamName: string;
+  paginationParamStart: number;
+  paginationParamStep: number;
+  paginationMaxPages: number;
+  // Response
+  responseFormat: ResponseFormat;
+  fullResponse: boolean;
+  neverError: boolean;
+  // Options
+  timeoutMs: number;
+  followRedirects: boolean;
+  ignoreSSL: boolean;
+}
+
+const defaultToolState: ToolFormState = {
+  name: "", description: "", endpoint: "", method: "GET",
+  authType: "none", authToken: "", authUsername: "", authPassword: "",
+  authHeaderName: "", authHeaderValue: "", authQueryName: "", authQueryValue: "",
+  bodyType: "json", rawBody: "",
+  queryParams: [], headers: [],
+  paginationMode: "none", paginationNextUrlPath: "", paginationParamName: "",
+  paginationParamStart: 0, paginationParamStep: 1, paginationMaxPages: 10,
+  responseFormat: "auto", fullResponse: false, neverError: false,
+  timeoutMs: 15000, followRedirects: true, ignoreSSL: false,
+};
+
+function recordToKV(obj: Record<string, string> | undefined): KVEntry[] {
+  if (!obj) return [];
+  return Object.entries(obj).map(([name, value]) => ({ name, value }));
+}
+
+function kvToRecord(entries: KVEntry[]): Record<string, string> | undefined {
+  const valid = entries.filter((e) => e.name.trim());
+  if (!valid.length) return undefined;
+  return Object.fromEntries(valid.map((e) => [e.name, e.value]));
+}
+
+function toolDocToFormState(tool: Doc<"customTools">): ToolFormState {
+  const auth = tool.auth as any;
+  const pagination = tool.pagination as any;
+  return {
+    name: tool.name,
+    description: tool.description,
+    endpoint: tool.endpoint,
+    method: tool.method,
+    authType: auth?.type ?? "none",
+    authToken: auth?.token ?? "",
+    authUsername: auth?.username ?? "",
+    authPassword: auth?.password ?? "",
+    authHeaderName: auth?.name ?? "",
+    authHeaderValue: auth?.value ?? "",
+    authQueryName: auth?.name ?? "",
+    authQueryValue: auth?.value ?? "",
+    bodyType: tool.bodyType ?? "json",
+    rawBody: tool.rawBody ?? "",
+    queryParams: tool.queryParams ?? [],
+    headers: recordToKV(tool.headers as Record<string, string>),
+    paginationMode: pagination?.mode ?? "none",
+    paginationNextUrlPath: pagination?.nextUrlPath ?? "",
+    paginationParamName: pagination?.paramName ?? "",
+    paginationParamStart: pagination?.paramStartValue ?? 0,
+    paginationParamStep: pagination?.paramStep ?? 1,
+    paginationMaxPages: pagination?.maxPages ?? 10,
+    responseFormat: tool.responseFormat ?? "auto",
+    fullResponse: tool.fullResponse ?? false,
+    neverError: tool.neverError ?? false,
+    timeoutMs: tool.timeoutMs ?? 15000,
+    followRedirects: tool.followRedirects ?? true,
+    ignoreSSL: tool.ignoreSSL ?? false,
+  };
+}
+
+function formStateToArgs(state: ToolFormState) {
+  const auth: any =
+    state.authType === "bearer" ? { type: "bearer", token: state.authToken }
+    : state.authType === "basic" ? { type: "basic", username: state.authUsername, password: state.authPassword }
+    : state.authType === "header" ? { type: "header", name: state.authHeaderName, value: state.authHeaderValue }
+    : state.authType === "query" ? { type: "query", name: state.authQueryName, value: state.authQueryValue }
+    : undefined;
+
+  const pagination: any =
+    state.paginationMode === "none" ? undefined : {
+      mode: state.paginationMode,
+      nextUrlPath: state.paginationNextUrlPath || undefined,
+      paramName: state.paginationParamName || undefined,
+      paramStartValue: state.paginationParamStart,
+      paramStep: state.paginationParamStep,
+      maxPages: state.paginationMaxPages,
+    };
+
+  return {
+    name: state.name.trim(),
+    description: state.description.trim() || state.name.trim(),
+    endpoint: state.endpoint.trim(),
+    method: state.method,
+    auth,
+    headers: kvToRecord(state.headers),
+    queryParams: state.queryParams.filter((p) => p.name.trim()).length > 0
+      ? state.queryParams.filter((p) => p.name.trim())
+      : undefined,
+    bodyType: state.bodyType !== "json" ? state.bodyType : undefined,
+    rawBody: state.rawBody || undefined,
+    pagination,
+    responseFormat: state.responseFormat !== "auto" ? state.responseFormat : undefined,
+    fullResponse: state.fullResponse || undefined,
+    neverError: state.neverError || undefined,
+    timeoutMs: state.timeoutMs !== 15000 ? state.timeoutMs : undefined,
+    followRedirects: state.followRedirects === false ? false : undefined,
+    ignoreSSL: state.ignoreSSL || undefined,
+  };
+}
+
+// Sub-component: key-value list editor
+function KVList({ entries, onChange, keyPlaceholder = "name", valuePlaceholder = "value" }: {
+  entries: KVEntry[];
+  onChange: (entries: KVEntry[]) => void;
+  keyPlaceholder?: string;
+  valuePlaceholder?: string;
+}) {
+  function update(i: number, field: "name" | "value", val: string) {
+    const next = [...entries];
+    next[i] = { ...next[i], [field]: val };
+    onChange(next);
+  }
+  function remove(i: number) {
+    onChange(entries.filter((_, idx) => idx !== i));
+  }
+  return (
+    <div className="space-y-2">
+      {entries.map((entry, i) => (
+        <div key={i} className="flex gap-2 items-center">
+          <input
+            type="text"
+            value={entry.name}
+            onChange={(e) => update(i, "name", e.target.value)}
+            placeholder={keyPlaceholder}
+            className="flex-1 bg-transparent border-b border-rule-strong pb-1.5 text-xs font-mono text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+          />
+          <input
+            type="text"
+            value={entry.value}
+            onChange={(e) => update(i, "value", e.target.value)}
+            placeholder={valuePlaceholder}
+            className="flex-1 bg-transparent border-b border-rule-strong pb-1.5 text-xs font-mono text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+          />
+          <button type="button" onClick={() => remove(i)} className="text-ink-faint hover:text-danger transition-colors shrink-0">
+            <X className="h-3 w-3" strokeWidth={1.5} />
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => onChange([...entries, { name: "", value: "" }])}
+        className="text-2xs uppercase tracking-[0.1em] text-ink-faint hover:text-ink transition-colors"
+      >
+        + Add row
+      </button>
+    </div>
+  );
+}
+
+const METHOD_COLORS: Record<string, string> = {
+  GET: "text-emerald-400 bg-emerald-950/50 border-emerald-800/60",
+  POST: "text-blue-400 bg-blue-950/50 border-blue-800/60",
+  PUT: "text-amber-400 bg-amber-950/50 border-amber-800/60",
+  PATCH: "text-orange-400 bg-orange-950/50 border-orange-800/60",
+  DELETE: "text-red-400 bg-red-950/50 border-red-800/60",
+};
+
+function HttpToolDialog({
+  state,
+  onChange,
+  onSubmit,
+  onClose,
+  submitLabel,
+  title,
+}: {
+  state: ToolFormState;
+  onChange: (s: ToolFormState) => void;
+  onSubmit: () => void;
+  onClose: () => void;
+  submitLabel: string;
+  title: string;
+}) {
+  const [tab, setTab] = useState<ToolTab>("basic");
+  const set = (patch: Partial<ToolFormState>) => onChange({ ...state, ...patch });
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const navItems: { id: ToolTab; label: string; hint?: string }[] = [
+    { id: "basic", label: "Basic", hint: "Name, URL, method" },
+    { id: "auth", label: "Authentication", hint: state.authType !== "none" ? state.authType : undefined },
+    { id: "body", label: "Body", hint: state.bodyType !== "json" ? state.bodyType : undefined },
+    { id: "params", label: "Params & Headers", hint: (state.queryParams.length + state.headers.length) > 0 ? `${state.queryParams.length + state.headers.length} set` : undefined },
+    { id: "pagination", label: "Pagination", hint: state.paginationMode !== "none" ? state.paginationMode.replace("_", " ") : undefined },
+    { id: "response", label: "Response", hint: state.responseFormat !== "auto" ? state.responseFormat : undefined },
+    { id: "options", label: "Options" },
+  ];
+
+  const dialog = (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+      <div className="relative w-full max-w-3xl h-[600px] border border-rule bg-surface shadow-2xl rise flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-rule shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className={`font-mono text-[10px] font-bold uppercase px-2 py-1 border ${METHOD_COLORS[state.method] ?? "text-ink-muted bg-surface-sunken border-rule"}`}>
+              {state.method}
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-ink truncate">
+                {state.name || title}
+              </p>
+              {state.endpoint && (
+                <p className="font-mono text-xs text-ink-faint truncate mt-0.5">{state.endpoint}</p>
+              )}
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-ink-faint hover:text-ink transition-colors shrink-0 ml-4">
+            <X className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+        </div>
+
+        {/* Body: sidebar + content */}
+        <div className="flex flex-1 min-h-0">
+          {/* Left nav */}
+          <nav className="w-44 shrink-0 border-r border-rule flex flex-col py-2 overflow-y-auto">
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setTab(item.id)}
+                className={`w-full text-left px-4 py-2.5 transition-colors group ${
+                  tab === item.id
+                    ? "bg-surface-sunken text-ink border-r-2 border-accent -mr-px"
+                    : "text-ink-muted hover:text-ink hover:bg-surface-sunken/50"
+                }`}
+              >
+                <span className="block text-xs font-medium">{item.label}</span>
+                {item.hint && (
+                  <span className="block text-[10px] text-ink-faint mt-0.5 font-mono truncate">{item.hint}</span>
+                )}
+              </button>
+            ))}
+          </nav>
+
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-5">
+            {/* Basic */}
+            {tab === "basic" && (
+              <>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="col-span-2">
+                    <Field label="Tool Name">
+                      <input autoFocus type="text" value={state.name} onChange={(e) => set({ name: e.target.value })}
+                        placeholder="get_weather" className={inputClass} />
+                    </Field>
+                  </div>
+                  <Field label="HTTP Method">
+                    <select value={state.method} onChange={(e) => set({ method: e.target.value as HttpMethod })} className={selectClass}>
+                      {["GET", "POST", "PUT", "DELETE", "PATCH"].map((m) => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                  </Field>
+                </div>
+                <Field label="Endpoint URL">
+                  <input type="text" value={state.endpoint} onChange={(e) => set({ endpoint: e.target.value })}
+                    placeholder="https://api.example.com/data" className={monoInputClass} />
+                  <p className="text-xs text-ink-faint mt-1.5">Use <code className="bg-surface-sunken px-1">{"{param}"}</code> in the URL to substitute agent input fields as path parameters.</p>
+                </Field>
+                <Field label="Description">
+                  <textarea value={state.description} onChange={(e) => set({ description: e.target.value })}
+                    placeholder="Describe what this tool does so the agent knows when to call it." rows={3}
+                    className={textareaClass} />
+                </Field>
+              </>
+            )}
+
+            {/* Auth */}
+            {tab === "auth" && (
+              <>
+                <Field label="Authentication Type">
+                  <select value={state.authType} onChange={(e) => set({ authType: e.target.value as AuthType })} className={selectClass}>
+                    <option value="none">No Authentication</option>
+                    <option value="bearer">Bearer Token — Authorization: Bearer &lt;token&gt;</option>
+                    <option value="basic">Basic Auth — Authorization: Basic &lt;base64&gt;</option>
+                    <option value="header">Custom Header</option>
+                    <option value="query">Query Parameter</option>
+                  </select>
+                </Field>
+
+                {state.authType === "bearer" && (
+                  <Field label="Token">
+                    <input type="text" value={state.authToken} onChange={(e) => set({ authToken: e.target.value })}
+                      placeholder="sk-..." className={monoInputClass} />
+                  </Field>
+                )}
+                {state.authType === "basic" && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <Field label="Username">
+                      <input type="text" value={state.authUsername} onChange={(e) => set({ authUsername: e.target.value })}
+                        placeholder="user" className={inputClass} />
+                    </Field>
+                    <Field label="Password">
+                      <input type="password" value={state.authPassword} onChange={(e) => set({ authPassword: e.target.value })}
+                        placeholder="••••••••" className={inputClass} />
+                    </Field>
+                  </div>
+                )}
+                {state.authType === "header" && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <Field label="Header Name">
+                      <input type="text" value={state.authHeaderName} onChange={(e) => set({ authHeaderName: e.target.value })}
+                        placeholder="X-API-Key" className={monoInputClass} />
+                    </Field>
+                    <Field label="Header Value">
+                      <input type="text" value={state.authHeaderValue} onChange={(e) => set({ authHeaderValue: e.target.value })}
+                        placeholder="your-api-key" className={monoInputClass} />
+                    </Field>
+                  </div>
+                )}
+                {state.authType === "query" && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <Field label="Param Name">
+                      <input type="text" value={state.authQueryName} onChange={(e) => set({ authQueryName: e.target.value })}
+                        placeholder="api_key" className={monoInputClass} />
+                    </Field>
+                    <Field label="Param Value">
+                      <input type="text" value={state.authQueryValue} onChange={(e) => set({ authQueryValue: e.target.value })}
+                        placeholder="your-api-key" className={monoInputClass} />
+                    </Field>
+                  </div>
+                )}
+                {state.authType === "none" && (
+                  <p className="text-sm text-ink-faint">No authentication will be sent with this request.</p>
+                )}
+              </>
+            )}
+
+            {/* Body */}
+            {tab === "body" && (
+              <>
+                <Field label="Body Format">
+                  <select value={state.bodyType} onChange={(e) => set({ bodyType: e.target.value as BodyType })} className={selectClass}>
+                    <option value="json">JSON — application/json</option>
+                    <option value="form-data">Form Data — multipart/form-data</option>
+                    <option value="url-encoded">URL Encoded — application/x-www-form-urlencoded</option>
+                    <option value="raw">Raw — custom content</option>
+                  </select>
+                </Field>
+                {state.bodyType === "raw" ? (
+                  <Field label="Raw Body">
+                    <textarea value={state.rawBody} onChange={(e) => set({ rawBody: e.target.value })}
+                      placeholder="Enter raw body content..." rows={8} className={textareaClass} />
+                  </Field>
+                ) : (
+                  <div className="rounded border border-rule bg-surface-sunken p-4 text-sm text-ink-faint space-y-1">
+                    <p className="font-medium text-ink-muted">How it works</p>
+                    <p>
+                      Fields defined in the Input Schema are sent as the request body in{" "}
+                      <strong className="text-ink">
+                        {state.bodyType === "json" ? "JSON" : state.bodyType === "form-data" ? "multipart form-data" : "URL-encoded"}
+                      </strong>{" "}
+                      format. The agent provides values for those fields when calling the tool.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Params & Headers */}
+            {tab === "params" && (
+              <div className="space-y-6">
+                <div>
+                  <p className="eyebrow mb-1">Static Query Parameters</p>
+                  <p className="text-xs text-ink-faint mb-4">Always appended to the URL. Use for fixed API options, not credentials (use Auth tab for those).</p>
+                  <KVList entries={state.queryParams} onChange={(v) => set({ queryParams: v })} keyPlaceholder="parameter name" valuePlaceholder="value" />
+                </div>
+                <div className="border-t border-rule pt-6">
+                  <p className="eyebrow mb-1">Custom Headers</p>
+                  <p className="text-xs text-ink-faint mb-4">Sent with every request. Auth headers are injected automatically from the Auth tab.</p>
+                  <KVList entries={state.headers} onChange={(v) => set({ headers: v })} keyPlaceholder="Content-Type" valuePlaceholder="application/json" />
+                </div>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {tab === "pagination" && (
+              <>
+                <Field label="Pagination Mode">
+                  <select value={state.paginationMode} onChange={(e) => set({ paginationMode: e.target.value as PaginationMode })} className={selectClass}>
+                    <option value="none">None — single request</option>
+                    <option value="next_url">Next URL — follow a link in the response</option>
+                    <option value="offset">Offset / Page — increment a query parameter</option>
+                  </select>
+                </Field>
+
+                {state.paginationMode === "next_url" && (
+                  <Field label="Next URL Path">
+                    <input type="text" value={state.paginationNextUrlPath} onChange={(e) => set({ paginationNextUrlPath: e.target.value })}
+                      placeholder="links.next" className={monoInputClass} />
+                    <p className="text-xs text-ink-faint mt-1.5">Dot-notation path to the next page URL in the JSON response. Stops when the value is empty or missing.</p>
+                  </Field>
+                )}
+
+                {state.paginationMode === "offset" && (
+                  <div className="grid grid-cols-3 gap-4">
+                    <Field label="Param Name">
+                      <input type="text" value={state.paginationParamName} onChange={(e) => set({ paginationParamName: e.target.value })}
+                        placeholder="page" className={monoInputClass} />
+                    </Field>
+                    <Field label="Start Value">
+                      <input type="number" value={state.paginationParamStart} onChange={(e) => set({ paginationParamStart: Number(e.target.value) })}
+                        className={inputClass} />
+                    </Field>
+                    <Field label="Increment">
+                      <input type="number" value={state.paginationParamStep} onChange={(e) => set({ paginationParamStep: Number(e.target.value) })}
+                        className={inputClass} />
+                    </Field>
+                  </div>
+                )}
+
+                {state.paginationMode !== "none" && (
+                  <Field label="Max Pages">
+                    <input type="number" value={state.paginationMaxPages} onChange={(e) => set({ paginationMaxPages: Number(e.target.value) })}
+                      min={1} max={100} className={inputClass} />
+                    <p className="text-xs text-ink-faint mt-1.5">Safety cap to prevent infinite loops. Results from all pages are merged and returned together.</p>
+                  </Field>
+                )}
+              </>
+            )}
+
+            {/* Response */}
+            {tab === "response" && (
+              <>
+                <Field label="Response Format">
+                  <select value={state.responseFormat} onChange={(e) => set({ responseFormat: e.target.value as ResponseFormat })} className={selectClass}>
+                    <option value="auto">Auto-detect — try JSON, fall back to text</option>
+                    <option value="json">JSON — always parse as JSON</option>
+                    <option value="text">Text — return raw string</option>
+                  </select>
+                </Field>
+
+                <div className="space-y-4 pt-1">
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <input type="checkbox" checked={state.fullResponse} onChange={(e) => set({ fullResponse: e.target.checked })}
+                      className="mt-0.5 accent-accent" />
+                    <div>
+                      <span className="text-sm font-medium text-ink">Full Response</span>
+                      <p className="text-xs text-ink-faint mt-0.5">Include HTTP status code, status text, and response headers alongside the body. Useful for debugging or when status codes matter.</p>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <input type="checkbox" checked={state.neverError} onChange={(e) => set({ neverError: e.target.checked })}
+                      className="mt-0.5 accent-accent" />
+                    <div>
+                      <span className="text-sm font-medium text-ink">Never Error</span>
+                      <p className="text-xs text-ink-faint mt-0.5">Return error details as a successful text response instead of throwing. Good for when the agent should handle failures gracefully.</p>
+                    </div>
+                  </label>
+                </div>
+              </>
+            )}
+
+            {/* Options */}
+            {tab === "options" && (
+              <>
+                <Field label="Timeout">
+                  <div className="flex items-baseline gap-2">
+                    <input type="number" value={state.timeoutMs} onChange={(e) => set({ timeoutMs: Number(e.target.value) })}
+                      min={1000} max={120000} step={1000} className="w-28 bg-transparent border-b border-rule-strong pb-2 text-sm text-ink focus:border-accent focus:outline-none" />
+                    <span className="text-xs text-ink-faint">ms (default 15 000)</span>
+                  </div>
+                </Field>
+
+                <div className="space-y-4 pt-1">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" checked={state.followRedirects} onChange={(e) => set({ followRedirects: e.target.checked })}
+                      className="mt-0.5 accent-accent" />
+                    <div>
+                      <span className="text-sm font-medium text-ink">Follow Redirects</span>
+                      <p className="text-xs text-ink-faint mt-0.5">Automatically follow HTTP 3xx redirects. Disable to receive the redirect response directly.</p>
+                    </div>
+                  </label>
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input type="checkbox" checked={state.ignoreSSL} onChange={(e) => set({ ignoreSSL: e.target.checked })}
+                      className="mt-0.5 accent-accent" />
+                    <div>
+                      <span className="text-sm font-medium text-ink">Ignore SSL Errors</span>
+                      <p className="text-xs text-ink-faint mt-0.5">Skip TLS certificate verification. Only use for trusted internal endpoints with self-signed certificates.</p>
+                    </div>
+                  </label>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-5 py-4 border-t border-rule shrink-0 bg-surface">
+          <p className="text-xs text-ink-faint">
+            {state.name && state.endpoint
+              ? <>Tool will be available as <code className="font-mono bg-surface-sunken px-1">custom_{state.name}</code></>
+              : "Fill in name and URL to save"}
+          </p>
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={onClose} className="text-sm text-ink-muted hover:text-ink transition-colors px-3 py-2">
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={onSubmit}
+              disabled={!state.name.trim() || !state.endpoint.trim()}
+              className="text-sm font-medium bg-ink text-ink-inverse px-4 py-2 hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              {submitLabel}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return createPortal(dialog, document.body);
+}
+
 function CustomToolsSection({ agent }: { agent: Doc<"agents"> }) {
   const tools = useQuery(api.customTools.list, { agentId: agent._id });
   const createTool = useMutation(api.customTools.create);
+  const updateTool = useMutation(api.customTools.update);
   const removeTool = useMutation(api.customTools.remove);
-  const [showAdd, setShowAdd] = useState(false);
-  const [newTool, setNewTool] = useState({
-    name: "",
-    description: "",
-    endpoint: "",
-    method: "GET" as const,
-  });
 
-  async function handleCreate() {
-    if (!newTool.name.trim() || !newTool.endpoint.trim()) return;
+  // dialog state: null = closed, "new" = creating, string id = editing
+  const [dialog, setDialog] = useState<null | "new" | string>(null);
+  const [formState, setFormState] = useState<ToolFormState>(defaultToolState);
+
+  function openNew() {
+    setFormState(defaultToolState);
+    setDialog("new");
+  }
+
+  function openEdit(tool: Doc<"customTools">) {
+    setFormState(toolDocToFormState(tool));
+    setDialog(tool._id);
+  }
+
+  function closeDialog() { setDialog(null); }
+
+  async function handleSubmit() {
+    if (!formState.name.trim() || !formState.endpoint.trim()) return;
     try {
-      await createTool({
-        agentId: agent._id,
-        name: newTool.name.trim(),
-        description: newTool.description.trim() || newTool.name.trim(),
-        endpoint: newTool.endpoint.trim(),
-        method: newTool.method,
-      });
-      setNewTool({ name: "", description: "", endpoint: "", method: "GET" });
-      setShowAdd(false);
-    } catch (err: any) {
-      alert(err.message);
-    }
+      if (dialog === "new") {
+        await createTool({ agentId: agent._id, ...formStateToArgs(formState) });
+      } else if (dialog) {
+        await updateTool({ toolId: dialog as any, ...formStateToArgs(formState) });
+      }
+      closeDialog();
+    } catch (err: any) { alert(err.message); }
   }
 
   return (
@@ -1370,73 +1943,13 @@ function CustomToolsSection({ agent }: { agent: Doc<"agents"> }) {
           )}
         </p>
         <button
-          onClick={() => setShowAdd(!showAdd)}
+          onClick={openNew}
           className="inline-flex items-center gap-1.5 text-2xs uppercase tracking-[0.12em] font-semibold text-ink-muted hover:text-ink transition-colors"
         >
           <Plus className="h-3 w-3" strokeWidth={1.75} />
           Add Tool
         </button>
       </div>
-
-      {showAdd && (
-        <div className="border-b border-rule p-6 space-y-4 bg-surface-sunken">
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Tool Name">
-              <input
-                type="text"
-                value={newTool.name}
-                onChange={(e) => setNewTool({ ...newTool, name: e.target.value })}
-                placeholder="get_weather"
-                className={inputClass}
-              />
-            </Field>
-            <Field label="HTTP Method">
-              <select
-                value={newTool.method}
-                onChange={(e) => setNewTool({ ...newTool, method: e.target.value as any })}
-                className={selectClass}
-              >
-                {["GET", "POST", "PUT", "DELETE", "PATCH"].map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </Field>
-          </div>
-          <Field label="Endpoint URL">
-            <input
-              type="text"
-              value={newTool.endpoint}
-              onChange={(e) => setNewTool({ ...newTool, endpoint: e.target.value })}
-              placeholder="https://api.example.com/data"
-              className={monoInputClass}
-            />
-          </Field>
-          <Field label="Description">
-            <input
-              type="text"
-              value={newTool.description}
-              onChange={(e) => setNewTool({ ...newTool, description: e.target.value })}
-              placeholder="What does this tool do?"
-              className={inputClass}
-            />
-          </Field>
-          <div className="flex gap-3 pt-1">
-            <button
-              onClick={handleCreate}
-              disabled={!newTool.name.trim() || !newTool.endpoint.trim()}
-              className="text-xs bg-ink text-surface px-3 py-1.5 font-semibold hover:opacity-90 disabled:opacity-30 transition-all"
-            >
-              Add Tool
-            </button>
-            <button
-              onClick={() => setShowAdd(false)}
-              className="text-xs text-ink-muted hover:text-ink transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
 
       {tools === undefined ? (
         <div className="p-6 space-y-[1px]">
@@ -1445,33 +1958,74 @@ function CustomToolsSection({ agent }: { agent: Doc<"agents"> }) {
           ))}
         </div>
       ) : tools.length === 0 ? (
-        <p className="px-6 py-8 text-sm text-ink-faint">
-          No custom tools. Add HTTP endpoints for your agent to call during conversations.
-        </p>
+        <div className="px-6 py-10 text-center">
+          <p className="text-sm text-ink-faint mb-3">No custom tools yet.</p>
+          <button onClick={openNew} className="text-xs text-ink-muted hover:text-ink underline underline-offset-2 transition-colors">
+            Add your first HTTP tool
+          </button>
+        </div>
       ) : (
         <ol className="divide-y divide-rule">
-          {tools.map((tool) => (
-            <li key={tool._id} className="group flex items-center justify-between px-6 py-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[10px] uppercase bg-surface-sunken border border-rule px-1.5 py-0.5 text-ink-muted">
-                    {tool.method}
-                  </span>
-                  <span className="text-sm text-ink">{tool.name}</span>
+          {tools.map((tool) => {
+            const authType = (tool.auth as any)?.type;
+            const pagMode = (tool.pagination as any)?.mode;
+            return (
+              <li key={tool._id} className="group flex items-center justify-between px-6 py-4 hover:bg-surface-sunken/40 transition-colors">
+                <div className="min-w-0 mr-4">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`font-mono text-[10px] font-bold uppercase px-1.5 py-0.5 border ${METHOD_COLORS[tool.method] ?? "text-ink-muted bg-surface-sunken border-rule"}`}>
+                      {tool.method}
+                    </span>
+                    <span className="text-sm text-ink font-medium">{tool.name}</span>
+                    {authType && authType !== "none" && (
+                      <span className="text-[10px] border border-rule px-1.5 py-0.5 text-ink-faint uppercase tracking-wide">
+                        {authType}
+                      </span>
+                    )}
+                    {pagMode && pagMode !== "none" && (
+                      <span className="text-[10px] border border-rule px-1.5 py-0.5 text-ink-faint uppercase tracking-wide">
+                        paginated
+                      </span>
+                    )}
+                  </div>
+                  <p className="font-mono text-xs text-ink-faint mt-1 truncate">
+                    {tool.endpoint}
+                  </p>
+                  {tool.description && tool.description !== tool.name && (
+                    <p className="text-xs text-ink-faint mt-0.5 truncate">{tool.description}</p>
+                  )}
                 </div>
-                <p className="font-mono text-xs text-ink-faint mt-0.5 truncate max-w-md">
-                  {tool.endpoint}
-                </p>
-              </div>
-              <button
-                onClick={() => removeTool({ toolId: tool._id })}
-                className="opacity-0 group-hover:opacity-100 p-1.5 text-ink-faint hover:text-danger focus:opacity-100 transition-all"
-              >
-                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-              </button>
-            </li>
-          ))}
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-all shrink-0">
+                  <button
+                    onClick={() => openEdit(tool)}
+                    className="p-1.5 text-ink-faint hover:text-ink transition-colors"
+                    title="Edit"
+                  >
+                    <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  </button>
+                  <button
+                    onClick={() => removeTool({ toolId: tool._id })}
+                    className="p-1.5 text-ink-faint hover:text-danger transition-colors"
+                    title="Delete"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  </button>
+                </div>
+              </li>
+            );
+          })}
         </ol>
+      )}
+
+      {dialog !== null && (
+        <HttpToolDialog
+          state={formState}
+          onChange={setFormState}
+          onSubmit={handleSubmit}
+          onClose={closeDialog}
+          submitLabel={dialog === "new" ? "Add Tool" : "Save Changes"}
+          title={dialog === "new" ? "New HTTP Tool" : "Edit Tool"}
+        />
       )}
     </section>
   );

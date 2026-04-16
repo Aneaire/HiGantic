@@ -134,26 +134,183 @@ export async function seedTimers({ ctx, agentId }: SeedContext) {
 // ── Custom HTTP Tools Seeder ─────────────────────────────────────────────
 
 export async function seedCustomHttpTools({ ctx, agentId }: SeedContext) {
-  const tools = [
+  // All endpoints are free public APIs — no local server or signup needed.
+  // httpbin.org  — HTTP echo/inspection service
+  // dummyjson.com — fake REST API with rich data
+  // pokeapi.co   — public Pokémon API with next-URL pagination
+  // open-meteo.com — free weather API, no key required
+
+  const tools: Array<{
+    name: string;
+    description: string;
+    endpoint: string;
+    method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
+    inputSchema: any;
+    headers?: any;
+    auth?: any;
+    bodyType?: "json" | "form-data" | "url-encoded" | "raw";
+    rawBody?: string;
+    queryParams?: { name: string; value: string }[];
+    pagination?: any;
+    responseFormat?: "auto" | "json" | "text";
+    fullResponse?: boolean;
+    neverError?: boolean;
+    timeoutMs?: number;
+    followRedirects?: boolean;
+  }> = [
+    // 1. Basic GET — echo with static query params
     {
-      name: "get_joke",
-      description: "Fetch a random programming joke from the public joke API",
-      endpoint: "https://official-joke-api.appspot.com/jokes/programming/random",
-      method: "GET" as const,
+      name: "echo_get",
+      description: "Echo back query params via httpbin. Verifies GET + static query param injection.",
+      endpoint: "https://httpbin.org/get",
+      method: "GET",
+      queryParams: [{ name: "source", value: "higantic" }],
       inputSchema: {},
     },
+    // 2. POST JSON body
     {
-      name: "get_cat_fact",
-      description: "Get a random cat fact from the Cat Facts API",
-      endpoint: "https://catfact.ninja/fact",
-      method: "GET" as const,
+      name: "echo_post",
+      description: "POST a JSON body to httpbin and get it echoed back. Verifies JSON body serialization.",
+      endpoint: "https://httpbin.org/post",
+      method: "POST",
+      bodyType: "json",
+      inputSchema: {
+        message: { type: "string", description: "A message to send" },
+        value: { type: "number", description: "A numeric value" },
+      },
+    },
+    // 3. Path parameter substitution
+    {
+      name: "get_user",
+      description: "Fetch a user by ID from DummyJSON. Tests {id} path parameter substitution.",
+      endpoint: "https://dummyjson.com/users/{id}",
+      method: "GET",
+      inputSchema: {
+        id: { type: "string", description: "User ID to look up, e.g. 1" },
+      },
+    },
+    // 4. Bearer token auth
+    {
+      name: "bearer_auth_test",
+      description: "Hit httpbin /bearer with a Bearer token. Returns 200 + echoes the token if header is present, 401 if missing.",
+      endpoint: "https://httpbin.org/bearer",
+      method: "GET",
+      auth: { type: "bearer", token: "higantic-test-token" },
       inputSchema: {},
     },
+    // 5. Basic auth
     {
-      name: "get_ip_info",
-      description: "Look up geolocation and info for an IP address. Pass ?query=<ip> to look up a specific IP, or omit for the current IP.",
-      endpoint: "http://ip-api.com/json",
-      method: "GET" as const,
+      name: "basic_auth_test",
+      description: "Hit httpbin /basic-auth/admin/secret with Basic auth. Returns 200 if credentials match, 401 otherwise.",
+      endpoint: "https://httpbin.org/basic-auth/admin/secret",
+      method: "GET",
+      auth: { type: "basic", username: "admin", password: "secret" },
+      inputSchema: {},
+    },
+    // 6. Header auth (X-API-Key) — reflected back in response
+    {
+      name: "header_auth_test",
+      description: "Send a custom X-Api-Key header to httpbin /headers. The key is echoed back in the response headers object.",
+      endpoint: "https://httpbin.org/headers",
+      method: "GET",
+      auth: { type: "header", name: "X-Api-Key", value: "higantic-api-key-456" },
+      inputSchema: {},
+    },
+    // 7. Query param auth — reflected back in response args
+    {
+      name: "query_auth_test",
+      description: "Append api_token as a query param to httpbin /get. The token is echoed in the args object.",
+      endpoint: "https://httpbin.org/get",
+      method: "GET",
+      auth: { type: "query", name: "api_token", value: "higantic-query-secret" },
+      inputSchema: {},
+    },
+    // 8. Form-data body
+    {
+      name: "form_data_post",
+      description: "POST multipart/form-data to httpbin. The form fields are echoed back under the 'form' key.",
+      endpoint: "https://httpbin.org/post",
+      method: "POST",
+      bodyType: "form-data",
+      inputSchema: {
+        name: { type: "string", description: "A name field" },
+        email: { type: "string", description: "An email field" },
+      },
+    },
+    // 9. URL-encoded body
+    {
+      name: "urlencoded_post",
+      description: "POST application/x-www-form-urlencoded to httpbin. Fields echoed under the 'form' key.",
+      endpoint: "https://httpbin.org/post",
+      method: "POST",
+      bodyType: "url-encoded",
+      inputSchema: {
+        username: { type: "string", description: "Username" },
+        action: { type: "string", description: "Action to perform" },
+      },
+    },
+    // 10. Pagination — next URL (PokéAPI)
+    {
+      name: "pokemon_paginated",
+      description: "Fetch Pokémon list from PokéAPI using next-URL pagination. Each page has 5 results; follows 'next' field across pages.",
+      endpoint: "https://pokeapi.co/api/v2/pokemon?limit=5",
+      method: "GET",
+      pagination: { mode: "next_url", nextUrlPath: "next", maxPages: 4 },
+      inputSchema: {},
+    },
+    // 11. Pagination — offset (DummyJSON)
+    {
+      name: "products_paginated",
+      description: "Fetch products from DummyJSON using skip-based offset pagination. Fetches 5 pages of 5 items each.",
+      endpoint: "https://dummyjson.com/products",
+      method: "GET",
+      queryParams: [{ name: "limit", value: "5" }],
+      pagination: { mode: "offset", paramName: "skip", paramStartValue: 0, paramStep: 5, maxPages: 5 },
+      inputSchema: {},
+    },
+    // 12. Full response — custom HTTP status codes
+    {
+      name: "check_status",
+      description: "Request a specific HTTP status code from httpbin. Full response mode returns status code + headers.",
+      endpoint: "https://httpbin.org/status/{code}",
+      method: "GET",
+      fullResponse: true,
+      neverError: true,
+      inputSchema: {
+        code: { type: "string", description: "HTTP status code to return, e.g. 200, 404, 500" },
+      },
+    },
+    // 13. Timeout test
+    {
+      name: "slow_request",
+      description: "Call httpbin /delay/2 which responds after 2 seconds. Timeout is 5s so it should succeed.",
+      endpoint: "https://httpbin.org/delay/2",
+      method: "GET",
+      timeoutMs: 5000,
+      inputSchema: {},
+    },
+    // 14. Raw body
+    {
+      name: "raw_body_post",
+      description: "POST a raw text body to httpbin /anything. The body is echoed back under the 'data' key.",
+      endpoint: "https://httpbin.org/anything",
+      method: "POST",
+      bodyType: "raw",
+      rawBody: "Hello from HiGantic custom HTTP tools!",
+      inputSchema: {},
+    },
+    // 15. Real weather data — static query params (Open-Meteo, no key needed)
+    {
+      name: "get_weather_manila",
+      description: "Fetch real current weather for Manila from Open-Meteo API. No API key required.",
+      endpoint: "https://api.open-meteo.com/v1/forecast",
+      method: "GET",
+      queryParams: [
+        { name: "latitude", value: "14.5995" },
+        { name: "longitude", value: "120.9842" },
+        { name: "current", value: "temperature_2m,wind_speed_10m,weathercode" },
+        { name: "timezone", value: "Asia/Manila" },
+      ],
       inputSchema: {},
     },
   ];

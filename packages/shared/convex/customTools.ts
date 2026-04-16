@@ -43,6 +43,17 @@ export const create = mutation({
     ),
     inputSchema: v.optional(v.any()),
     headers: v.optional(v.any()),
+    auth: v.optional(v.any()),
+    bodyType: v.optional(v.union(v.literal("json"), v.literal("form-data"), v.literal("url-encoded"), v.literal("raw"))),
+    rawBody: v.optional(v.string()),
+    queryParams: v.optional(v.array(v.object({ name: v.string(), value: v.string() }))),
+    pagination: v.optional(v.any()),
+    responseFormat: v.optional(v.union(v.literal("auto"), v.literal("json"), v.literal("text"))),
+    fullResponse: v.optional(v.boolean()),
+    neverError: v.optional(v.boolean()),
+    timeoutMs: v.optional(v.number()),
+    followRedirects: v.optional(v.boolean()),
+    ignoreSSL: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await requireAuthUser(ctx);
@@ -75,6 +86,17 @@ export const create = mutation({
       method: args.method,
       inputSchema: args.inputSchema,
       headers: args.headers,
+      auth: args.auth,
+      bodyType: args.bodyType,
+      rawBody: args.rawBody,
+      queryParams: args.queryParams,
+      pagination: args.pagination,
+      responseFormat: args.responseFormat,
+      fullResponse: args.fullResponse,
+      neverError: args.neverError,
+      timeoutMs: args.timeoutMs,
+      followRedirects: args.followRedirects,
+      ignoreSSL: args.ignoreSSL,
     });
   },
 });
@@ -85,17 +107,26 @@ export const update = mutation({
     name: v.optional(v.string()),
     description: v.optional(v.string()),
     endpoint: v.optional(v.string()),
-    method: v.optional(
-      v.union(
-        v.literal("GET"),
-        v.literal("POST"),
-        v.literal("PUT"),
-        v.literal("DELETE"),
-        v.literal("PATCH")
-      )
-    ),
+    method: v.optional(v.union(
+      v.literal("GET"),
+      v.literal("POST"),
+      v.literal("PUT"),
+      v.literal("DELETE"),
+      v.literal("PATCH")
+    )),
     inputSchema: v.optional(v.any()),
     headers: v.optional(v.any()),
+    auth: v.optional(v.any()),
+    bodyType: v.optional(v.union(v.literal("json"), v.literal("form-data"), v.literal("url-encoded"), v.literal("raw"))),
+    rawBody: v.optional(v.string()),
+    queryParams: v.optional(v.array(v.object({ name: v.string(), value: v.string() }))),
+    pagination: v.optional(v.any()),
+    responseFormat: v.optional(v.union(v.literal("auto"), v.literal("json"), v.literal("text"))),
+    fullResponse: v.optional(v.boolean()),
+    neverError: v.optional(v.boolean()),
+    timeoutMs: v.optional(v.number()),
+    followRedirects: v.optional(v.boolean()),
+    ignoreSSL: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     const user = await requireAuthUser(ctx);

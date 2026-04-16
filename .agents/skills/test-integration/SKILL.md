@@ -25,14 +25,23 @@ All integration testing goes through the **Sandbox Test Agent** — a dedicated 
 
 ## Convex credentials
 
-Always use these flags for `npx convex` commands:
+Use the `CONVEX_DEPLOY_KEY` from the root `.env` file — **this device is not logged into Convex interactively**:
 
 ```bash
---url https://robust-gnat-728.convex.cloud
---admin-key "eyJ2MiI6IjU4ZjJjYmMyYWI1YTQ4OGQ4M2QxZGIyZThhZGU1YmZiIn0="
+# Read the key from the root .env first
+DEPLOY_KEY=$(grep CONVEX_DEPLOY_KEY /home/aneaire/Desktop/Projects/HiGantic/.env | cut -d= -f2-)
+
+# Run any convex command
+CONVEX_DEPLOY_KEY="$DEPLOY_KEY" npx convex run seed:verifyConversation '{"conversationId":"<id>"}'
 ```
 
-All commands must be run from `packages/shared/` for `npx convex deploy`.
+Or inline (one-liner):
+```bash
+CONVEX_DEPLOY_KEY="dev:robust-gnat-728|..." npx convex run seed:run '{"email":"aneaire010@gmail.com","force":true}'
+```
+
+All `npx convex` commands (run, deploy) must be prefixed with `CONVEX_DEPLOY_KEY="..."`.
+For `npx convex deploy`, run from `packages/shared/`.
 
 ## dispatchAgentPrompt pattern
 
@@ -104,8 +113,45 @@ export const verifyMyEvents = internalQuery({
 | `seed:verifyAutomationResults` | Verifies automation fired correctly |
 | `seed:testSchedule` | Creates and fires a schedule |
 | `seed:verifyScheduleResults` | Verifies schedule ran |
+| `seed:testCustomHttpTools` | Tests all 15 custom HTTP tool test cases (auth, body types, pagination, etc.) |
 | `seed:verifyConversation` | Generic: check any conversation result |
 | `seed:verifyDiscordEvents` | Check discord events in event bus |
+
+## Custom HTTP Tools testing
+
+A local Hono test server lives at `/home/aneaire/Desktop/Projects/tests/hono-http-test` and runs on port **3737**. It covers all HTTP tool feature cases:
+
+All 15 tools use **free public APIs** — no local server, no signup required:
+
+| Tool | Real endpoint | Feature tested |
+|------|--------------|----------------|
+| echo_get | GET httpbin.org/get | Static query params |
+| echo_post | POST httpbin.org/post | JSON body |
+| get_user | GET dummyjson.com/users/{id} | Path param substitution |
+| bearer_auth_test | GET httpbin.org/bearer | Bearer token auth |
+| basic_auth_test | GET httpbin.org/basic-auth/admin/secret | Basic auth |
+| header_auth_test | GET httpbin.org/headers | Header API key (echoed back) |
+| query_auth_test | GET httpbin.org/get | Query param auth (echoed in args) |
+| form_data_post | POST httpbin.org/post | multipart/form-data body |
+| urlencoded_post | POST httpbin.org/post | url-encoded body |
+| pokemon_paginated | GET pokeapi.co/api/v2/pokemon?limit=5 | next_url pagination (`next` field) |
+| products_paginated | GET dummyjson.com/products | offset pagination (skip param) |
+| check_status | GET httpbin.org/status/{code} | Full response (headers + status) |
+| slow_request | GET httpbin.org/delay/2 | Timeout handling (timeoutMs: 5000) |
+| raw_body_post | POST httpbin.org/anything | Raw text body |
+| get_weather_manila | GET api.open-meteo.com/v1/forecast | Static query params, real data |
+
+**To run the full test suite:**
+```bash
+# 1. Make sure the agent server is running: cd packages/agent && bun run dev
+# 2. Run the seeded sandbox agent against all 15 tools
+CONVEX_DEPLOY_KEY="..." npx convex run seed:testCustomHttpTools '{"agentId":"<sandbox-agent-id>"}'
+# → returns conversationId
+# 3. Wait ~30s, then verify
+CONVEX_DEPLOY_KEY="..." npx convex run seed:verifyConversation '{"conversationId":"<id>"}'
+```
+
+The 15 tools are auto-seeded when the sandbox agent is created (`seed:run`).
 
 ## What to test for any new integration
 
@@ -117,28 +163,36 @@ export const verifyMyEvents = internalQuery({
 ## Full test flow example (Discord)
 
 ```bash
+# Shorthand — set once for the session
+export CONVEX_DEPLOY_KEY="dev:robust-gnat-728|..."
+
 # 1. Add mutations to seed.ts, then deploy
-cd packages/shared && npx convex deploy --url ... --admin-key "..."
+cd packages/shared && CONVEX_DEPLOY_KEY="$CONVEX_DEPLOY_KEY" npx convex deploy
 
 # 2. Run a test
-npx convex run --url ... --admin-key "..." seed:testDiscordThreadAndReaction '{}'
+CONVEX_DEPLOY_KEY="$CONVEX_DEPLOY_KEY" npx convex run seed:testDiscordThreadAndReaction '{}'
 # → returns conversationId
 
 # 3. Wait ~20s, then check result
-npx convex run --url ... --admin-key "..." seed:verifyConversation '{"conversationId":"<id>"}'
+CONVEX_DEPLOY_KEY="$CONVEX_DEPLOY_KEY" npx convex run seed:verifyConversation '{"conversationId":"<id>"}'
 
 # 4. Check event bus
-npx convex run --url ... --admin-key "..." seed:verifyDiscordEvents '{}'
+CONVEX_DEPLOY_KEY="$CONVEX_DEPLOY_KEY" npx convex run seed:verifyDiscordEvents '{}'
 
 # 5. Test automation
-npx convex run --url ... --admin-key "..." seed:testDiscordAutomation '{}'
+CONVEX_DEPLOY_KEY="$CONVEX_DEPLOY_KEY" npx convex run seed:testDiscordAutomation '{}'
 ```
 
 ## Important notes
 
-- The Sandbox Test Agent must exist: run `seed:run` first if it's missing (latest sandbox run: 2026-04-15 for `johnv@hometownroofingtx.com`; slug `sandbox-test-agent`, userId `k973cgefw5ehpy3kz733kzc8r582tbes`)
+- The Sandbox Test Agent must exist: run `seed:run` first if it's missing
+  ```bash
+  CONVEX_DEPLOY_KEY="..." npx convex run seed:run '{"email":"aneaire010@gmail.com","force":true}'
+  ```
+- The sandbox agent auto-selects its model: uses `gemini-3-flash-preview` when a `google_ai` credential exists for the user (preferred), otherwise falls back to `claude-sonnet-4-6`. The `google_ai` credential is auto-linked at seed time.
 - The agent server must be running (`cd packages/agent && bun run dev`) and built with latest code
 - If tools say "not available", the agent server likely needs a restart to pick up new code
+- For custom HTTP tool tests, the Hono test server must also be running on port 3737
 - Which tool-set credentials get fetched at run time is driven by `TOOL_SET_REGISTRY` entries with `requiresCredential: true` (via `getCredentialToolSetKeys()` in `packages/shared/src/tool-set-registry.ts`), NOT a hand-maintained array in `run-agent.ts`. If a new integration's credential isn't loading, check the registry entry.
 - Event field in `agentEvents` is `event`, not `name` — filter on `e.event`
 

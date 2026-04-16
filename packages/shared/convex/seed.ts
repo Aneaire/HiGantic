@@ -555,7 +555,13 @@ export const run = internalMutation({
       ...CORE_TOOL_SETS,
     ];
 
-    // 5. Create the sandbox agent
+    // 5. Create the sandbox agent — use Gemini if a google_ai credential exists
+    const allCreds = await ctx.db.query("credentials").collect();
+    const geminiCred = allCreds.find(
+      (c) => c.userId === user._id && c.type === "google_ai"
+    );
+    const sandboxModel = geminiCred ? "gemini-3-flash-preview" : "claude-sonnet-4-6";
+
     const agentId = await ctx.db.insert("agents", {
       userId: user._id,
       name: "Sandbox Test Agent",
@@ -563,12 +569,23 @@ export const run = internalMutation({
       description:
         "Full-featured test agent for debugging and validating all system capabilities.",
       systemPrompt: SYSTEM_PROMPT,
-      model: "claude-sonnet-4-6",
+      model: sandboxModel,
       enabledToolSets,
       status: "active",
     });
     summary.agentId = agentId;
     summary.enabledToolSets = enabledToolSets;
+    summary.model = sandboxModel;
+
+    // Link Gemini credential if found
+    if (geminiCred) {
+      await ctx.db.insert("agentCredentialLinks", {
+        agentId,
+        credentialId: geminiCred._id,
+        toolSetName: "google_ai",
+      });
+      summary.geminiCredentialLinked = geminiCred._id;
+    }
 
     const seedCtx = { ctx, agentId, userId: user._id };
 
@@ -1559,34 +1576,54 @@ export const testDiscordAutomation = internalMutation({
 });
 
 /**
- * Test: Custom HTTP Tools — asks the agent to fetch a joke using the get_joke custom tool.
+ * Test: Custom HTTP Tools — comprehensive test of all 15 localhost test cases.
+ * Requires the Hono test server running at http://localhost:3737
  *
- * Run: npx convex run seed:testCustomHttpTools '{}'
+ * Run: npx convex run seed:testCustomHttpTools '{"agentId":"<optional>"}'
  * Then check: npx convex run seed:verifyConversation '{"conversationId":"<id from output>"}'
  */
 export const testCustomHttpTools = internalMutation({
-  handler: async (ctx) => {
-    const agent = await getSandboxAgent(ctx);
+  args: { agentId: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const agent = args.agentId
+      ? await ctx.db.get(args.agentId as any)
+      : await getSandboxAgent(ctx);
+    if (!agent) throw new Error("Agent not found. Run seed:run first.");
     const user = await ctx.db.get(agent.userId);
     if (!user) throw new Error("Agent owner not found.");
 
-    const prompt = `Please test the custom HTTP tools by doing the following in order:
-1. Use the get_joke tool to fetch a programming joke.
-2. Report the full joke (setup + punchline) you received from the API.
-3. Confirm the tool call succeeded and show the raw response.`;
+    const prompt = `Please test each of the following custom HTTP tools in order and report the result of each call. Be concise — one line per result showing the tool name and key data returned.
+
+1. custom_echo_get — call it (no input needed, it has static query params)
+2. custom_echo_post — call it with message="hello from agent" and value=42
+3. custom_get_user — call it with id="5"
+4. custom_get_secure_data — call it (no input, auth is pre-configured)
+5. custom_basic_auth_test — call it (no input, auth is pre-configured)
+6. custom_api_key_test — call it (no input, auth is pre-configured)
+7. custom_query_auth_test — call it (no input, auth is pre-configured)
+8. custom_form_data_post — call it with name="Agent" and email="agent@test.com"
+9. custom_urlencoded_post — call it with username="testuser" and action="login"
+10. custom_paginated_next_url — call it (fetches all pages automatically)
+11. custom_paginated_offset — call it (fetches pages by offset automatically)
+12. custom_check_status — call it with code="200"
+13. custom_slow_endpoint — call it (2s delay, 5s timeout — should succeed)
+14. custom_raw_body_post — call it (raw body is pre-set)
+15. custom_get_weather_manila — call it (lat/lon are static query params)
+
+After all calls, summarize: how many succeeded, how many failed, and list any that returned errors.`;
 
     const result = await dispatchAgentPrompt(
       ctx,
       agent._id,
       user._id,
       prompt,
-      "TEST: Custom HTTP Tools"
+      "TEST: Custom HTTP Tools — All 15"
     );
 
     return {
       status: "dispatched",
       ...result,
-      message: "Custom HTTP tools test dispatched. Check seed:verifyConversation in ~20s.",
+      message: "Custom HTTP tools test dispatched. Check seed:verifyConversation in ~60s.",
     };
   },
 });

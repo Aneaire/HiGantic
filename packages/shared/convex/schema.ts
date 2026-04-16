@@ -78,6 +78,28 @@ export default defineSchema({
       v.literal("PATCH")
     ),
     headers: v.optional(v.any()),
+    // Auth
+    auth: v.optional(v.any()),
+    // Body
+    bodyType: v.optional(v.union(
+      v.literal("json"),
+      v.literal("form-data"),
+      v.literal("url-encoded"),
+      v.literal("raw"),
+    )),
+    rawBody: v.optional(v.string()),
+    // Static query params
+    queryParams: v.optional(v.array(v.object({ name: v.string(), value: v.string() }))),
+    // Pagination
+    pagination: v.optional(v.any()),
+    // Response
+    responseFormat: v.optional(v.union(v.literal("auto"), v.literal("json"), v.literal("text"))),
+    fullResponse: v.optional(v.boolean()),
+    neverError: v.optional(v.boolean()),
+    // Options
+    timeoutMs: v.optional(v.number()),
+    followRedirects: v.optional(v.boolean()),
+    ignoreSSL: v.optional(v.boolean()),
   }).index("by_agent", ["agentId"]),
 
   // ── Sidebar Tabs (Agent Pages) ─────────────────────────────────────
