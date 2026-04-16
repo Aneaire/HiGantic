@@ -64,6 +64,15 @@ export const start = mutation({
       }
     }
 
+    // Inherit the last-used creator model so the preference persists across sessions.
+    const recentSessions = await ctx.db
+      .query("creatorSessions")
+      .withIndex("by_user", (q) => q.eq("userId", user._id))
+      .order("desc")
+      .collect();
+    const lastCreatorModel =
+      recentSessions.find((s) => s.creatorModel)?.creatorModel ?? null;
+
     // Create draft agent
     const agentId = await ctx.db.insert("agents", {
       userId: user._id,
@@ -95,6 +104,7 @@ export const start = mutation({
         model: "claude-sonnet-4-6",
         enabledToolSets: ["memory", "web_search", "pages", "custom_http_tools"],
       },
+      ...(lastCreatorModel ? { creatorModel: lastCreatorModel } : {}),
     });
 
     // Auto-send a trigger message so the creator agent greets the user
@@ -147,6 +157,12 @@ export const startEdit = mutation({
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect();
 
+    // Inherit the last-used creator model so the preference persists across sessions.
+    const lastCreatorModel =
+      [...activeSessions]
+        .sort((a, b) => b._creationTime - a._creationTime)
+        .find((s) => s.creatorModel)?.creatorModel ?? null;
+
     for (const session of activeSessions) {
       if (session.status === "active") {
         // Mark as abandoned but preserve conversation history for edit sessions
@@ -185,6 +201,7 @@ export const startEdit = mutation({
       agentId: args.agentId,
       conversationId,
       partialConfig,
+      ...(lastCreatorModel ? { creatorModel: lastCreatorModel } : {}),
     });
 
     // Auto-send trigger message
@@ -286,6 +303,21 @@ export const listByAgent = query({
     );
 
     return enriched;
+  },
+});
+
+export const setCreatorModel = mutation({
+  args: {
+    sessionId: v.id("creatorSessions"),
+    model: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await requireAuthUser(ctx);
+    const session = await ctx.db.get(args.sessionId);
+    if (!session || session.userId !== user._id) {
+      throw new Error("Session not found");
+    }
+    await ctx.db.patch(args.sessionId, { creatorModel: args.model });
   },
 });
 

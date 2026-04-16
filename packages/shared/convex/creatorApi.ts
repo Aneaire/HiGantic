@@ -65,7 +65,10 @@ export const getSessionByConversation = query({
       (s) => s.conversationId === args.conversationId && s.status === "active"
     );
     if (!session) return null;
-    return { mode: session.mode ?? "create" };
+    return {
+      mode: session.mode ?? "create",
+      creatorModel: session.creatorModel ?? null,
+    };
   },
 });
 

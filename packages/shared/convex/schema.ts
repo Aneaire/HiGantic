@@ -623,6 +623,8 @@ export default defineSchema({
     partialConfig: v.optional(v.any()),
     agentId: v.optional(v.id("agents")),
     conversationId: v.optional(v.id("conversations")),
+    /** Model used by the creator/editor AI itself (not the agent being built). */
+    creatorModel: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_agent", ["agentId"]),
