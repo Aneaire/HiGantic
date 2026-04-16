@@ -942,6 +942,83 @@ function SaveButton({ saving, saved }: { saving: boolean; saved: boolean }) {
   );
 }
 
+// ── Bot Soul (shared identity scaffolding for Discord + Slack bots) ──
+
+type BotSoul = {
+  identity?: string;
+  personality?: string;
+  boundaries?: string;
+  whenToEngage?: string;
+};
+
+function BotSoulFields({
+  value,
+  onChange,
+}: {
+  value: BotSoul;
+  onChange: (next: BotSoul) => void;
+}) {
+  const set = (key: keyof BotSoul) => (e: React.ChangeEvent<HTMLTextAreaElement>) =>
+    onChange({ ...value, [key]: e.target.value });
+  return (
+    <div className="space-y-4 border border-rule bg-surface-sunken p-4">
+      <div>
+        <p className="eyebrow">Soul</p>
+        <p className="mt-1 text-[10px] text-ink-faint">
+          Structured identity for non-authorized users (bot mode). Authorized users use the agent's full system prompt instead. Leave blank to skip.
+        </p>
+      </div>
+      <Field label="Identity">
+        <textarea
+          value={value.identity ?? ""}
+          onChange={set("identity")}
+          placeholder="e.g. Customer support bot for Hometown Roofing — answers warranty questions and routes leads."
+          rows={2}
+          className={textareaClass}
+        />
+      </Field>
+      <Field label="Personality">
+        <textarea
+          value={value.personality ?? ""}
+          onChange={set("personality")}
+          placeholder="e.g. Warm, concise, never pushy. Uses plain language, not jargon."
+          rows={2}
+          className={textareaClass}
+        />
+      </Field>
+      <Field label="Boundaries">
+        <textarea
+          value={value.boundaries ?? ""}
+          onChange={set("boundaries")}
+          placeholder="e.g. Don't quote prices. Never speculate about repair timelines. Redirect billing questions to ops."
+          rows={2}
+          className={textareaClass}
+        />
+      </Field>
+      <Field label="When to Engage">
+        <textarea
+          value={value.whenToEngage ?? ""}
+          onChange={set("whenToEngage")}
+          placeholder="e.g. Only respond when explicitly @mentioned or DM'd. Stay silent in casual chatter."
+          rows={2}
+          className={textareaClass}
+        />
+      </Field>
+    </div>
+  );
+}
+
+function normalizeSoul(soul: BotSoul): BotSoul | undefined {
+  const trimmed: BotSoul = {
+    identity: soul.identity?.trim() || undefined,
+    personality: soul.personality?.trim() || undefined,
+    boundaries: soul.boundaries?.trim() || undefined,
+    whenToEngage: soul.whenToEngage?.trim() || undefined,
+  };
+  const hasAny = Object.values(trimmed).some((v) => v);
+  return hasAny ? trimmed : undefined;
+}
+
 // ── Discord Bot (Gateway / two-way chat) ────────────────────────────
 
 function DiscordBotSection({ agent }: { agent: Doc<"agents"> }) {
@@ -950,6 +1027,9 @@ function DiscordBotSection({ agent }: { agent: Doc<"agents"> }) {
   const [enabled, setEnabled] = useState(agent.discordBotEnabled ?? false);
   const [botPrompt, setBotPrompt] = useState(agent.discordBotPrompt ?? "");
   const [botModel, setBotModel] = useState(agent.discordBotModel ?? "");
+  const [soul, setSoul] = useState<BotSoul>(
+    ((agent as any).discordSoul ?? {}) as BotSoul
+  );
   const [authorizedUsers, setAuthorizedUsers] = useState<string[]>(
     agent.discordAuthorizedUsers ?? []
   );
@@ -967,6 +1047,7 @@ function DiscordBotSection({ agent }: { agent: Doc<"agents"> }) {
         discordBotPrompt: botPrompt || undefined,
         discordBotModel: botModel || undefined,
         discordAuthorizedUsers: authorizedUsers,
+        discordSoul: normalizeSoul(soul),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -1016,6 +1097,8 @@ function DiscordBotSection({ agent }: { agent: Doc<"agents"> }) {
                 Used for non-authorized users. Leave blank to use the agent's system prompt.
               </p>
             </Field>
+
+            <BotSoulFields value={soul} onChange={setSoul} />
 
             <Field label="Bot Model (optional)">
               <select
@@ -1098,6 +1181,9 @@ function SlackBotSection({ agent }: { agent: Doc<"agents"> }) {
   const [enabled, setEnabled] = useState((agent as any).slackBotEnabled ?? false);
   const [botPrompt, setBotPrompt] = useState((agent as any).slackBotPrompt ?? "");
   const [botModel, setBotModel] = useState((agent as any).slackBotModel ?? "");
+  const [soul, setSoul] = useState<BotSoul>(
+    ((agent as any).slackSoul ?? {}) as BotSoul
+  );
   const [authorizedUsers, setAuthorizedUsers] = useState<string[]>(
     (agent as any).slackAuthorizedUsers ?? []
   );
@@ -1115,6 +1201,7 @@ function SlackBotSection({ agent }: { agent: Doc<"agents"> }) {
         slackBotPrompt: botPrompt || undefined,
         slackBotModel: botModel || undefined,
         slackAuthorizedUsers: authorizedUsers,
+        slackSoul: normalizeSoul(soul),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -1164,6 +1251,8 @@ function SlackBotSection({ agent }: { agent: Doc<"agents"> }) {
                 Used for non-authorized Slack users. Leave blank to use the agent's system prompt.
               </p>
             </Field>
+
+            <BotSoulFields value={soul} onChange={setSoul} />
 
             <Field label="Bot Model (optional)">
               <select

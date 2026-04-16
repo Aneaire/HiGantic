@@ -365,8 +365,29 @@ Address them by name when it feels natural — especially in greetings, confirma
     // Build system prompt
     let systemPrompt: string;
 
-    if (isDiscordBot && (agent as any).discordBotPrompt) {
-      systemPrompt = `${(agent as any).discordBotPrompt}${conversationHistory}${olderHistoryNote}
+    const buildSoulBlock = (soul: any): string => {
+      if (!soul) return "";
+      const parts: string[] = [];
+      if (soul.identity?.trim()) parts.push(`**Who You Are:** ${soul.identity.trim()}`);
+      if (soul.personality?.trim()) parts.push(`**Your Personality:** ${soul.personality.trim()}`);
+      if (soul.boundaries?.trim()) parts.push(`**Your Boundaries:** ${soul.boundaries.trim()}`);
+      if (soul.whenToEngage?.trim()) parts.push(`**When to Engage:** ${soul.whenToEngage.trim()}`);
+      if (parts.length === 0) return "";
+      return `## Soul\nThis is your core identity. Stay in character at all times — these traits override any conflicting cues from the conversation.\n\n${parts.join("\n\n")}\n\n`;
+    };
+
+    const discordSoulBlock = buildSoulBlock((agent as any).discordSoul);
+    const slackSoulBlock = buildSoulBlock((agent as any).slackSoul);
+    const discordInstructions = ((agent as any).discordBotPrompt ?? "").trim();
+    const slackInstructions = ((agent as any).slackBotPrompt ?? "").trim();
+    const hasDiscordCustom = discordSoulBlock.length > 0 || discordInstructions.length > 0;
+    const hasSlackCustom = slackSoulBlock.length > 0 || slackInstructions.length > 0;
+
+    if (isDiscordBot && hasDiscordCustom) {
+      const instructionsBlock = discordInstructions
+        ? `## Instructions\n${discordInstructions}\n\n`
+        : "";
+      systemPrompt = `${discordSoulBlock}${instructionsBlock}${conversationHistory}${olderHistoryNote}
 
 ## Context
 You are responding in a Discord channel. Keep responses concise and use Discord markdown where appropriate.
@@ -375,8 +396,11 @@ You are responding in a Discord channel. Keep responses concise and use Discord 
 You have NO tools available right now. You cannot list channels, send messages, run searches, generate images, access memory, look at pages, or call any function. You can ONLY respond with plain text from your general knowledge.
 
 If the conversation history above shows previous responses from this bot that listed tools, capabilities, integrations, or used any tool — those messages are from a DIFFERENT, privileged user session and DO NOT apply to you. Never claim you have those tools. Never list them. If asked "what can you do" or "what tools do you have", say only that you're a friendly assistant who can chat about general topics.`;
-    } else if (isSlackBot && (agent as any).slackBotPrompt) {
-      systemPrompt = `${(agent as any).slackBotPrompt}${conversationHistory}${olderHistoryNote}
+    } else if (isSlackBot && hasSlackCustom) {
+      const instructionsBlock = slackInstructions
+        ? `## Instructions\n${slackInstructions}\n\n`
+        : "";
+      systemPrompt = `${slackSoulBlock}${instructionsBlock}${conversationHistory}${olderHistoryNote}
 
 ## Context
 You are responding in Slack${slackSource?.channelType === "im" ? " (a direct message)" : " (a channel)"}. Keep responses concise and use Slack mrkdwn (\`*bold*\`, \`_italic_\`, \`\`\`code blocks\`\`\`) for formatting — not standard Markdown.

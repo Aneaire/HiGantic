@@ -2,6 +2,13 @@ import { mutation, query, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUser, getOrCreateAuthUser, requireAuthUser } from "./auth";
 
+const botSoulValidator = v.object({
+  identity: v.optional(v.string()),
+  personality: v.optional(v.string()),
+  boundaries: v.optional(v.string()),
+  whenToEngage: v.optional(v.string()),
+});
+
 export const list = query({
   handler: async (ctx) => {
     const user = await getAuthUser(ctx);
@@ -257,6 +264,7 @@ export const updateDiscordBot = mutation({
     discordBotPrompt: v.optional(v.string()),
     discordBotModel: v.optional(v.string()),
     discordAuthorizedUsers: v.optional(v.array(v.string())),
+    discordSoul: v.optional(botSoulValidator),
   },
   handler: async (ctx, args) => {
     const user = await requireAuthUser(ctx);
@@ -275,6 +283,7 @@ export const updateSlackBot = mutation({
     slackBotPrompt: v.optional(v.string()),
     slackBotModel: v.optional(v.string()),
     slackAuthorizedUsers: v.optional(v.array(v.string())),
+    slackSoul: v.optional(botSoulValidator),
   },
   handler: async (ctx, args) => {
     const user = await requireAuthUser(ctx);

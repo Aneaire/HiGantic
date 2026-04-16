@@ -33,11 +33,27 @@ export default defineSchema({
     discordBotPrompt: v.optional(v.string()),
     discordBotModel: v.optional(v.string()),
     discordAuthorizedUsers: v.optional(v.array(v.string())),
+    discordSoul: v.optional(
+      v.object({
+        identity: v.optional(v.string()),
+        personality: v.optional(v.string()),
+        boundaries: v.optional(v.string()),
+        whenToEngage: v.optional(v.string()),
+      })
+    ),
     // ── Slack Bot (Socket Mode / two-way chat) ──────────────────────
     slackBotEnabled: v.optional(v.boolean()),
     slackBotPrompt: v.optional(v.string()),
     slackBotModel: v.optional(v.string()),
     slackAuthorizedUsers: v.optional(v.array(v.string())),
+    slackSoul: v.optional(
+      v.object({
+        identity: v.optional(v.string()),
+        personality: v.optional(v.string()),
+        boundaries: v.optional(v.string()),
+        whenToEngage: v.optional(v.string()),
+      })
+    ),
   })
     .index("by_user", ["userId"])
     .index("by_slug", ["slug"]),
