@@ -1,6 +1,7 @@
 import { mutation, query, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUser, getOrCreateAuthUser, requireAuthUser } from "./auth";
+import { getDefaultModelForUser } from "./modelDefaults";
 
 const botSoulValidator = v.object({
   identity: v.optional(v.string()),
@@ -57,6 +58,8 @@ export const create = mutation({
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
 
+    const defaultModel = await getDefaultModelForUser(ctx, user._id);
+
     return await ctx.db.insert("agents", {
       userId: user._id,
       name: args.name,
@@ -64,7 +67,7 @@ export const create = mutation({
       description: args.description,
       systemPrompt:
         args.systemPrompt ?? `You are ${args.name}, a helpful AI assistant.`,
-      model: "claude-sonnet-4-6",
+      model: defaultModel,
       enabledToolSets: ["memory", "web_search", "pages", "custom_http_tools"],
       status: "active",
     });
@@ -76,7 +79,7 @@ export const createFromTemplate = mutation({
     name: v.string(),
     description: v.string(),
     systemPrompt: v.string(),
-    model: v.string(),
+    model: v.optional(v.string()),
     enabledToolSets: v.array(v.string()),
     starterPages: v.optional(
       v.array(v.object({ label: v.string(), type: v.string() }))
@@ -114,13 +117,16 @@ export const createFromTemplate = mutation({
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-|-$/g, "");
 
+    // Always pick model based on user's AI provider credentials
+    const defaultModel = await getDefaultModelForUser(ctx, user._id);
+
     const agentId = await ctx.db.insert("agents", {
       userId: user._id,
       name: args.name,
       slug,
       description: args.description,
       systemPrompt: args.systemPrompt,
-      model: args.model,
+      model: defaultModel,
       enabledToolSets: args.enabledToolSets,
       status: "active",
     });

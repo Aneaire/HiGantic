@@ -34,6 +34,7 @@ import type * as imageGenerationHelpers from "../imageGenerationHelpers.js";
 import type * as memories from "../memories.js";
 import type * as memoriesInternal from "../memoriesInternal.js";
 import type * as messages from "../messages.js";
+import type * as modelDefaults from "../modelDefaults.js";
 import type * as processAutomation from "../processAutomation.js";
 import type * as scheduledActions from "../scheduledActions.js";
 import type * as seed from "../seed.js";
@@ -84,6 +85,7 @@ declare const fullApi: ApiFromModules<{
   memories: typeof memories;
   memoriesInternal: typeof memoriesInternal;
   messages: typeof messages;
+  modelDefaults: typeof modelDefaults;
   processAutomation: typeof processAutomation;
   scheduledActions: typeof scheduledActions;
   seed: typeof seed;

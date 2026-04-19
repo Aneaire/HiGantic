@@ -199,7 +199,6 @@ const TEMPLATES: Record<
     name: string;
     description: string;
     systemPrompt: string;
-    model: string;
     enabledToolSets: string[];
     starterPages?: Array<{ label: string; type: string }>;
     starterEndpoints?: Array<{
@@ -231,7 +230,6 @@ Help the user plan their day, manage to-dos, set reminders, and stay on top of t
 - Store preferences and routines in memory (wake-up time, work hours, habits)
 - At the start of each conversation, review open tasks and suggest priorities
 - Keep notes organized for quick reference`,
-    model: "claude-sonnet-4-6",
     enabledToolSets: ["memory", "pages", "timers", "schedules"],
     starterPages: [
       { label: "Daily Tasks", type: "tasks" },
@@ -259,7 +257,7 @@ Guide the user through journaling, mood check-ins, gratitude practice, and weekl
 - Use memory to track mood patterns, recurring themes, and milestones
 - Suggest weekly reflection summaries based on the week's entries
 - Keep prompts and templates in the Prompts & Reflections page for reuse`,
-    model: "claude-sonnet-4-6",
+
     enabledToolSets: ["memory", "pages"],
     starterPages: [
       { label: "Journal Entries", type: "notes" },
@@ -287,7 +285,7 @@ Help the user learn new topics, take structured notes, practice with Q&A, and tr
 - Track learning goals as tasks with progress updates
 - Store the user's learning level and interests in memory
 - Suggest related topics and next steps after each study session`,
-    model: "claude-sonnet-4-6",
+
     enabledToolSets: ["memory", "web_search", "pages"],
     starterPages: [
       { label: "Study Notes", type: "notes" },
@@ -315,7 +313,7 @@ Help the user track expenses, manage budgets, analyze spending patterns, and wor
 - Store budget preferences and income info in memory
 - Use Budget Notes for monthly summaries, goals, and financial plans
 - When the user mentions a purchase, proactively ask if they'd like to log it`,
-    model: "claude-sonnet-4-6",
+
     enabledToolSets: ["memory", "pages"],
     starterPages: [
       { label: "Transactions", type: "data_table" },
@@ -342,7 +340,7 @@ Help users with their questions, troubleshoot issues, and provide clear solution
 - If you can't resolve something, explain why and suggest next steps
 - Track recurring issues in your task board
 - Save important context about the user in memory for future conversations`,
-    model: "claude-sonnet-4-6",
+
     enabledToolSets: ["memory", "web_search", "pages", "custom_http_tools"],
     starterPages: [
       { label: "Open Tickets", type: "tasks" },
@@ -369,7 +367,7 @@ Help users research topics thoroughly. Find accurate information, analyze it cri
 - Use spreadsheets to compare options or track data points
 - Store key findings in memory for follow-up conversations
 - When the user asks about a broad topic, break it into sub-questions and research each`,
-    model: "claude-sonnet-4-6",
+
     enabledToolSets: ["memory", "web_search", "pages", "custom_http_tools"],
     starterPages: [
       { label: "Research Notes", type: "notes" },
@@ -397,7 +395,7 @@ Help users plan, track, and manage projects. Break down goals into actionable ta
 - Create notes pages for meeting notes, decisions, and project documentation
 - Remember project context across conversations
 - Ask about blockers and suggest solutions`,
-    model: "claude-sonnet-4-6",
+
     enabledToolSets: ["memory", "web_search", "pages", "custom_http_tools"],
     starterPages: [
       { label: "Project Tasks", type: "tasks" },
@@ -425,7 +423,7 @@ Help users write, edit, and improve content — from emails and blog posts to re
 - When editing, explain your changes
 - Offer multiple variations when the user is unsure about tone or direction
 - Use notes to keep running lists of ideas, outlines, and feedback`,
-    model: "claude-sonnet-4-6",
+
     enabledToolSets: ["memory", "pages"],
     starterPages: [
       { label: "Drafts", type: "notes" },
@@ -455,7 +453,7 @@ Handle API requests from external systems. You have full access to your pages (s
 - Keep responses focused on the requested data — no conversational filler
 - When querying spreadsheets, use list_spreadsheet_data and filter the results in your response
 - When the request asks to create/update data, use the appropriate write tools and confirm the action`,
-    model: "claude-sonnet-4-6",
+
     enabledToolSets: ["memory", "web_search", "pages", "custom_http_tools", "rest_api"],
     starterPages: [
       { label: "API Endpoints", type: "api" },
@@ -535,7 +533,7 @@ Help users collect, organize, and analyze data. Build spreadsheets, identify pat
 - Search the web for benchmarks, comparisons, or reference data
 - Store analysis context in memory for follow-up questions
 - Ask what metrics or KPIs matter most to the user`,
-    model: "claude-sonnet-4-6",
+
     enabledToolSets: ["memory", "web_search", "pages", "custom_http_tools"],
     starterPages: [
       { label: "Data Tracker", type: "spreadsheet" },
@@ -551,7 +549,7 @@ function createUseTemplateTool(ctx: CreatorContext) {
 
   return tool(
     "use_template",
-    `Apply a starter template to quickly configure the agent. This sets name, description, system prompt, model, and tool sets all at once. The user can then customize any part. Available templates:\n${templateList}`,
+    `Apply a starter template to quickly configure the agent. This sets name, description, system prompt, and tool sets all at once (the model stays as the user's default). The user can then customize any part. Available templates:\n${templateList}`,
     {
       templateId: z
         .enum(
@@ -573,7 +571,6 @@ function createUseTemplateTool(ctx: CreatorContext) {
         name: template.name,
         description: template.description,
         systemPrompt: template.systemPrompt,
-        model: template.model,
         enabledToolSets: template.enabledToolSets,
       });
 
@@ -633,7 +630,7 @@ function createUseTemplateTool(ctx: CreatorContext) {
         content: [
           {
             type: "text" as const,
-            text: `Applied "${input.templateId}" template: ${template.name}.\nSet name, description, system prompt, model (${template.model}), and tool sets.${pagesNote}${endpointsNote}\n\nThe user can now customize any of these. Show them a summary and ask if they'd like to adjust anything.`,
+            text: `Applied "${input.templateId}" template: ${template.name}.\nSet name, description, system prompt, and tool sets. The model was kept as-is (based on the user's credentials).${pagesNote}${endpointsNote}\n\nThe user can now customize any of these. Show them a summary and ask if they'd like to adjust anything.`,
           },
         ],
       };

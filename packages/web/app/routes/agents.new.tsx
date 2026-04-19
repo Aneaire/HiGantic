@@ -23,7 +23,6 @@ export default function NewAgentPage() {
         name: template.name,
         description: template.description,
         systemPrompt: template.systemPrompt,
-        model: template.model,
         enabledToolSets: template.enabledToolSets,
         starterPages: template.starterPages,
         starterEndpoints: template.starterEndpoints,

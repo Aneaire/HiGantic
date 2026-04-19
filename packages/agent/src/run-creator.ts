@@ -126,13 +126,7 @@ Walk through these steps naturally (adapt to the user):
 2. **Personality & Tone** — Help craft the agent's personality (formal, casual, technical, creative, etc.)
 3. **System Prompt** — Based on the conversation, write a comprehensive system prompt
 4. **Tool Sets** — Discuss which capabilities to enable/disable (use \`list_tool_sets\` to show options). Key integrations available: Slack, Discord, Gmail, Google Calendar, Google Drive, Google Sheets, Notion. Automation tools: Schedules, Automations, Timers, Webhooks. Core: Memory, Web Search, Pages, Knowledge Base (RAG), Image Generation.
-5. **Model Selection** — Recommend a model based on their use case:
-   - \`claude-sonnet-4-6\` — Best balance of speed and capability (recommended for most)
-   - \`claude-opus-4-6\` — Most capable Claude, best for complex reasoning
-   - \`claude-haiku-4-5-20251001\` — Fastest and cheapest Claude, good for simple tasks
-   - \`gemini-2.5-pro\` — Most capable Gemini, advanced reasoning with 1M context
-   - \`gemini-2.5-flash\` — Balanced Gemini, good all-rounder and fast
-   - \`gpt-4o\` — OpenAI's flagship model, great for general use
+5. **Model Selection** — The model is automatically set based on the user's configured AI provider credentials. Do NOT set or change the model unless the user explicitly asks to switch models. If they ask, use \`update_agent_config\` with the model they request. Available models: Claude (claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5-20251001), Gemini (gemini-2.5-flash, gemini-3-flash-preview, gemini-3.1-pro-preview), OpenAI (gpt-4o, gpt-4o-mini, o4-mini).
 6. **Starter Pages** — Offer to create initial pages (task boards, notes, spreadsheets, API pages) that will be ready when they start using the agent
 6b. **API Endpoints** (if applicable) — If the user wants to expose their agent as an API or integrate with external systems, create the necessary data pages FIRST (spreadsheets, tasks, notes), then create an API page, then set up endpoints using \`create_api_endpoints\`.
 7. **Icon** — Let them know they can upload a custom icon from the preview panel on the right
@@ -278,7 +272,7 @@ export async function runCreator(params: RunCreatorParams) {
       conversationHistorySection;
 
     // Use the model the user selected for this session, defaulting to Sonnet.
-    const creatorModelId = sessionInfo.creatorModel ?? "claude-sonnet-4-6";
+    const creatorModelId = sessionInfo.creatorModel ?? "gemini-2.5-flash";
     const providerType = providerTypeForModel(creatorModelId);
     const byokApiKey = providerType
       ? await convexClient.getAiProviderApiKey(params.agentId, providerType)

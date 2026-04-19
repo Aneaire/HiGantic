@@ -2,6 +2,7 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getOrCreateAuthUser, requireAuthUser } from "./auth";
 import { internal } from "./_generated/api";
+import { getDefaultModelForUser } from "./modelDefaults";
 
 export const start = mutation({
   handler: async (ctx) => {
@@ -73,13 +74,16 @@ export const start = mutation({
     const lastCreatorModel =
       recentSessions.find((s) => s.creatorModel)?.creatorModel ?? null;
 
+    // Pick default model based on which AI provider credentials the user has
+    const defaultModel = await getDefaultModelForUser(ctx, user._id);
+
     // Create draft agent
     const agentId = await ctx.db.insert("agents", {
       userId: user._id,
       name: "New Agent",
       slug: `draft-${Date.now()}`,
       systemPrompt: "You are a helpful AI assistant.",
-      model: "claude-sonnet-4-6",
+      model: defaultModel,
       enabledToolSets: ["memory", "web_search", "pages", "custom_http_tools"],
       status: "draft",
     });
@@ -101,7 +105,7 @@ export const start = mutation({
       partialConfig: {
         name: "New Agent",
         systemPrompt: "You are a helpful AI assistant.",
-        model: "claude-sonnet-4-6",
+        model: defaultModel,
         enabledToolSets: ["memory", "web_search", "pages", "custom_http_tools"],
       },
       ...(lastCreatorModel ? { creatorModel: lastCreatorModel } : {}),

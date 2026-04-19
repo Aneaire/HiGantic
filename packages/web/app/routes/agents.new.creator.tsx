@@ -88,7 +88,7 @@ function CreatorView({
   const setCreatorModel = useMutation(api.creatorSessions.setCreatorModel);
   const aiProviders = useQuery(api.credentials.listAiProviders);
 
-  const creatorModel = (session as any)?.creatorModel ?? "claude-sonnet-4-6";
+  const creatorModel = (session as any)?.creatorModel ?? "gemini-2.5-flash";
   const enabledModels =
     aiProviders && aiProviders.length > 0
       ? CHAT_MODELS.filter((m) => {
@@ -96,6 +96,13 @@ function CreatorView({
           return cred ? aiProviders.includes(cred) : true;
         }).map((m) => m.value)
       : undefined;
+
+  // Auto-correct model if the current one isn't available for the user's credentials
+  useEffect(() => {
+    if (enabledModels && enabledModels.length > 0 && !enabledModels.includes(creatorModel)) {
+      setCreatorModel({ sessionId, model: enabledModels[0] });
+    }
+  }, [enabledModels, creatorModel]);
 
   useEffect(() => {
     if (agent && agent.status === "active") {
