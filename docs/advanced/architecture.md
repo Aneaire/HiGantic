@@ -32,7 +32,7 @@
 
 ### `packages/agent` — Runtime
 - Hono HTTP server
-- Claude Agent SDK for agentic execution
+- Vercel AI SDK for agentic execution (Gemini, OpenAI, OpenRouter)
 - MCP tool server with dynamic registration
 - Job polling, cron polling, timer polling
 - Webhook handling + automation processing
@@ -47,7 +47,7 @@
 3. Agent server polls and claims the job
 4. Server loads: agent config, conversation history, tools, memories, context
 5. Server builds system prompt + MCP tool server
-6. Claude Agent SDK runs with tools available
+6. Vercel AI SDK runs with tools available
 7. Agent streams response → debounced mutations to Convex
 8. Web UI receives real-time updates via Convex subscriptions
 9. Job marked as done
@@ -78,7 +78,7 @@
 
 ## Tool Architecture
 
-Tools are registered as MCP tools via `@anthropic-ai/claude-agent-sdk`:
+Tools are registered as MCP tools and threaded into the Vercel AI SDK's `streamText({ tools })` call:
 
 ```
 buildMcpServer()
@@ -103,7 +103,7 @@ buildMcpServer()
 
 For Gemini models, tools are registered separately via `buildGeminiTools()` in `gemini-tools.ts` using native function declarations instead of MCP.
 
-Tools are also gated at the SDK level via `buildAllowedTools()`, which returns the exact list of tool names the Claude SDK should accept.
+Tools are also gated at the SDK level via `buildAllowedTools()`, which returns the exact list of tool names the AI SDK should accept.
 
 ## Database Tables
 

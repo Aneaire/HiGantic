@@ -12,7 +12,6 @@ import { CHAT_MODELS, getProviderIcon } from "~/components/ModelDropdown";
 const TOOL_LABELS = getToolSetLabelsMap();
 
 const PROVIDER_TO_CRED: Record<string, string> = {
-  Claude: "anthropic",
   Gemini: "google_ai",
   OpenAI: "openai",
 };
@@ -311,7 +310,7 @@ function IconUpload({
 function ModelPreviewChip({ model }: { model?: string }) {
   if (!model) return <p className="text-sm text-ink-faint italic">Not set</p>;
   const entry = CHAT_MODELS.find((m) => m.value === model);
-  const Icon = getProviderIcon(entry?.group ?? "Claude");
+  const Icon = getProviderIcon(entry?.group ?? "Gemini");
   return (
     <div className="inline-flex items-center gap-2">
       <Icon className="h-3.5 w-3.5 text-ink-faint shrink-0" />

@@ -612,27 +612,6 @@ function SystemPromptDialog({
 
 const ALL_MODELS = [
   {
-    id: "claude-sonnet-4-6",
-    name: "Claude Sonnet 4.6",
-    description: "Balanced speed and capability",
-    provider: "Anthropic",
-    tier: "$$",
-  },
-  {
-    id: "claude-opus-4-6",
-    name: "Claude Opus 4.6",
-    description: "Most capable Claude model",
-    provider: "Anthropic",
-    tier: "$$$",
-  },
-  {
-    id: "claude-haiku-4-5-20251001",
-    name: "Claude Haiku 4.5",
-    description: "Fastest and most affordable",
-    provider: "Anthropic",
-    tier: "$",
-  },
-  {
     id: "gemini-3.1-pro-preview",
     name: "Gemini 3.1 Pro",
     description: "Most capable Gemini model",
@@ -681,7 +660,6 @@ function EnabledModelsSection({ agent }: { agent: Doc<"agents"> }) {
 
   const aiProviders = useQuery(api.credentials.listAiProviders);
   const PROVIDER_TO_CRED: Record<string, string> = {
-    Anthropic: "anthropic",
     Google: "google_ai",
     OpenAI: "openai",
   };

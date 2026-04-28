@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "ai": "^5.0.0",
-    "@ai-sdk/anthropic": "^2.0.0",
     "@ai-sdk/google": "^2.0.0",
     "@ai-sdk/openai": "^2.0.0",
     "@openrouter/ai-sdk-provider": "^1.0.0",

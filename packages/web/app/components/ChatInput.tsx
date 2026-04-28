@@ -168,7 +168,6 @@ export function ChatInput({
   const credentialFilteredModels = useMemo(() => {
     if (!aiProviders || aiProviders.length === 0) return undefined;
     const GROUP_TO_CRED: Record<string, string> = {
-      Claude: "anthropic",
       Gemini: "google_ai",
       OpenAI: "openai",
     };

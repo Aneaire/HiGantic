@@ -35,7 +35,7 @@ export function meta(_args: Route.MetaArgs) {
     {
       name: "description",
       content:
-        "Build autonomous AI agents with persistent memory, tools, and automations. Powered by Claude and Gemini.",
+        "Build autonomous AI agents with persistent memory, tools, and automations. Powered by Gemini and OpenAI.",
     },
   ];
 }
@@ -112,7 +112,6 @@ const COPYRIGHT_YEAR = new Date().getFullYear();
  * See CLAUDE.md / AGENTS.md for the full checklist when adding a model.
  */
 const SUPPORTED_MODELS = [
-  { name: "Claude", color: "text-neon-400" },
   { name: "Gemini", color: "text-blue-400" },
   { name: "OpenAI", color: "text-green-400" },
 ];
@@ -663,7 +662,7 @@ function ToolTape() {
     { icon: Shield, name: "Credentials", desc: "AES-256 encrypted vault", color: "group-hover:text-emerald-400" },
     { icon: Database, name: "RAG", desc: "Vector search on documents", color: "group-hover:text-violet-400" },
     { icon: Puzzle, name: "Custom Tools", desc: "Your own HTTP endpoints", color: "group-hover:text-pink-400" },
-    { icon: Cpu, name: "Multi-Model", desc: "Claude, Gemini & more", color: "group-hover:text-teal-400" },
+    { icon: Cpu, name: "Multi-Model", desc: "Gemini, OpenAI & more", color: "group-hover:text-teal-400" },
   ];
 
   return (

@@ -9,7 +9,6 @@
       "name": "@agent-maker/agent",
       "dependencies": {
         "@agent-maker/shared": "workspace:*",
-        "@ai-sdk/anthropic": "^2.0.0",
         "@ai-sdk/google": "^2.0.0",
         "@ai-sdk/openai": "^2.0.0",
         "@hono/node-server": "^1.14.0",
@@ -101,8 +100,6 @@
     "@agent-maker/video": ["@agent-maker/video@workspace:packages/video"],
 
     "@agent-maker/web": ["@agent-maker/web@workspace:packages/web"],
-
-    "@ai-sdk/anthropic": ["@ai-sdk/anthropic@2.0.74", "", { "dependencies": { "@ai-sdk/provider": "2.0.1", "@ai-sdk/provider-utils": "3.0.23" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-1Z7142GVIF4XkcSvQpL6ij2c7J51dtm4/Z84P+O0bGBDZI1Nbvz897hXkJf2cfNhq5XdpvUYbI+oExXM7Ko8Zw=="],
 
     "@ai-sdk/gateway": ["@ai-sdk/gateway@2.0.77", "", { "dependencies": { "@ai-sdk/provider": "2.0.1", "@ai-sdk/provider-utils": "3.0.23", "@vercel/oidc": "3.1.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-n2zh7Qh5/VHeoR395vrUQBRbOcrIZ6vx8uvdsBkBAQDWrPylwMd31hv9UisFMT/kJGSD1yxcoFKx2Mk0ZNCung=="],
 

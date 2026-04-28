@@ -24,11 +24,11 @@ export const list = query({
   },
 });
 
-/** Returns which AI provider credential types the user has configured (e.g. ["anthropic", "google_ai"]) */
+/** Returns which AI provider credential types the user has configured (e.g. ["google_ai", "openai"]) */
 export const listAiProviders = query({
   handler: async (ctx) => {
     const user = await requireAuthUser(ctx);
-    const AI_PROVIDER_TYPES = ["anthropic", "google_ai", "openai"];
+    const AI_PROVIDER_TYPES = ["google_ai", "openai"];
     const creds = await ctx.db
       .query("credentials")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
@@ -223,7 +223,7 @@ export const _getLinkByAgentToolset = internalQuery({
 });
 
 /** Look up a user's AI-provider credential of the given type. AI providers
- * (anthropic / google_ai / openai) are user-scoped rather than linked to a tool
+ * (google_ai / openai) are user-scoped rather than linked to a tool
  * set, so the runtime matches by userId + type. Prefers a credential marked
  * valid; falls back to any match so a never-tested key still works. */
 export const _getUserAiProviderCredential = internalQuery({

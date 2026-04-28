@@ -1034,12 +1034,14 @@ export const run = internalMutation({
       ...CORE_TOOL_SETS,
     ];
 
-    // 5. Create the sandbox agent — use Gemini if a google_ai credential exists
+    // 5. Create the sandbox agent. Gemini is always available (platform-level
+    // GEMINI_API_KEY), so no credential-type branching is required. If the
+    // user has a personal google_ai credential we still link it so BYOK works.
+    const sandboxModel = "gemini-3-flash-preview";
     const allCreds = await ctx.db.query("credentials").collect();
     const geminiCred = allCreds.find(
       (c) => c.userId === user._id && c.type === "google_ai"
     );
-    const sandboxModel = geminiCred ? "gemini-3-flash-preview" : "claude-sonnet-4-6";
 
     const agentId = await ctx.db.insert("agents", {
       userId: user._id,
@@ -1243,7 +1245,7 @@ export const createDevOpsAgent = internalMutation({
       slug: DEVOPS_SLUG,
       description: "Fires webhooks and manages tasks on the localhost:3737 sandbox server.",
       systemPrompt: DEVOPS_SYSTEM_PROMPT,
-      model: "claude-sonnet-4-6",
+      model: "gemini-2.5-flash",
       enabledToolSets: ["custom_http_tools"],
       status: "active",
     });
@@ -1917,8 +1919,8 @@ export const fixSandboxModels = internalMutation({
     if (!agent) return { error: "sandbox agent not found" };
 
     await ctx.db.patch(agent._id, {
-      slackBotModel: "claude-haiku-4-5-20251001",
-      discordBotModel: "claude-haiku-4-5-20251001",
+      slackBotModel: "gemini-2.5-flash",
+      discordBotModel: "gemini-2.5-flash",
     } as any);
 
     // Clear stuck processing assistant messages older than 60s so Slack polls
@@ -2322,7 +2324,7 @@ export const verifyByokCredentials = internalQuery({
       .first();
     if (!agent) return { error: "sandbox agent not found" };
 
-    const AI_TYPES = ["anthropic", "google_ai", "openai"];
+    const AI_TYPES = ["google_ai", "openai"];
     const creds = await ctx.db
       .query("credentials")
       .withIndex("by_user", (q: any) => q.eq("userId", agent.userId))
@@ -2477,7 +2479,7 @@ export const restoreSandboxModel = internalMutation({
   args: { model: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const agent = await getSandboxAgent(ctx);
-    const model = args.model ?? "claude-sonnet-4-6";
+    const model = args.model ?? "gemini-3-flash-preview";
     await ctx.db.patch(agent._id, { model } as any);
     return { restoredTo: model };
   },

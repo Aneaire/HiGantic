@@ -240,31 +240,6 @@ export const CREDENTIAL_TYPE_REGISTRY: Record<string, CredentialTypeDef> = {
 
   // ── AI Model Providers ─────────────────────────────────────────────────
 
-  anthropic: {
-    type: "anthropic",
-    label: "Anthropic (Claude)",
-    description: "Use Claude models (Sonnet, Opus, Haiku) as the agent's AI brain",
-    icon: "Bot",
-    authMethod: "api_key",
-    fields: [
-      {
-        key: "apiKey",
-        label: "Anthropic API Key",
-        type: "password",
-        placeholder: "sk-ant-...",
-        required: true,
-        helpText: "Get your API key from console.anthropic.com",
-      },
-    ],
-    compatibleToolSets: [],
-    test: {
-      method: "GET",
-      url: "https://api.anthropic.com/v1/models",
-      headers: { "x-api-key": "{{apiKey}}", "anthropic-version": "2023-06-01" },
-      expectedStatus: 200,
-    },
-  },
-
   google_ai: {
     type: "google_ai",
     label: "Google AI (Gemini)",
