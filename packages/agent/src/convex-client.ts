@@ -485,7 +485,7 @@ export class AgentConvexClient {
 
   /**
    * Fetch the user's stored API key for the given AI provider type
-   * ("anthropic" | "google_ai" | "openai"). Returns null if the user has not
+   * ("google_ai" | "openai"). Returns null if the user has not
    * configured that credential (caller should then fall back to server env var).
    * Cached per agent+provider using the same TTL as tool-set credentials.
    */

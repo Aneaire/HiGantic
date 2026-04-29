@@ -211,9 +211,9 @@ export const getDecryptedForUser = action({
 // ── Server-facing AI-provider key lookup ──────────────────────────────
 
 /** Returns `{ apiKey }` for the given agent's owning user and AI provider
- * type ("anthropic" | "google_ai" | "openai"), or null if the user has not
- * stored that credential. Used by the agent runtime to thread BYOK keys into
- * the Vercel AI SDK's model factory. */
+ * type ("google_ai" | "openai"), or null if the user has not stored that
+ * credential. Used by the agent runtime to thread BYOK keys into the Vercel
+ * AI SDK's model factory. */
 export const getAiProviderApiKey = action({
   args: {
     serverToken: v.string(),

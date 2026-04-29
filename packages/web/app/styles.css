@@ -460,13 +460,12 @@ body {
 }
 
 @keyframes slide-models {
-  0%, 27%   { transform: translateY(0); }
-  33%, 60%  { transform: translateY(-16px); }
-  66%, 93%  { transform: translateY(-32px); }
-  100%      { transform: translateY(0); }
+  0%, 43%   { transform: translateY(0); }
+  50%, 93%  { transform: translateY(-16px); }
+  100%     { transform: translateY(0); }
 }
 .model-slider-track {
-  animation: slide-models 9s ease-in-out infinite;
+  animation: slide-models 6s ease-in-out infinite;
 }
 
 @keyframes marquee-scroll {

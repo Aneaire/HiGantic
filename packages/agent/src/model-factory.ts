@@ -1,5 +1,4 @@
 import type { LanguageModel } from "ai";
-import { anthropic, createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { openai, createOpenAI } from "@ai-sdk/openai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
@@ -18,19 +17,14 @@ const DEFAULT_MODEL = "gemini-2.5-flash";
 
 /** Credential type key (matches CREDENTIAL_TYPE_REGISTRY) for each provider
  * family. Returned so callers can fetch the matching stored credential. */
-export type AiProviderType =
-  | "anthropic"
-  | "google_ai"
-  | "openai"
-  | "openrouter";
+export type AiProviderType = "google_ai" | "openai" | "openrouter";
 
 /** Maps a model id to its provider credential type, or null if unrecognized. */
 export function providerTypeForModel(
   modelId: string | undefined | null
 ): AiProviderType | null {
   const id = (modelId ?? "").trim();
-  if (!id) return "anthropic"; // default model is claude-*
-  if (id.startsWith("claude-")) return "anthropic";
+  if (!id) return "google_ai"; // default model is gemini-*
   if (id.startsWith("gemini-")) return "google_ai";
   if (
     id.startsWith("gpt-") ||
@@ -57,10 +51,6 @@ export function getLanguageModel(
   const id = (modelId ?? "").trim() || DEFAULT_MODEL;
   const apiKey = opts.apiKey?.trim() || undefined;
 
-  if (id.startsWith("claude-")) {
-    if (apiKey) return createAnthropic({ apiKey })(id);
-    return anthropic(id);
-  }
   if (id.startsWith("gemini-")) {
     if (apiKey) return createGoogleGenerativeAI({ apiKey })(id);
     return defaultGoogle(id);
@@ -80,7 +70,7 @@ export function getLanguageModel(
   if (apiKey) return createOpenRouter({ apiKey })(id);
   if (!openrouter) {
     throw new Error(
-      `Unrecognized model "${id}". Set OPENROUTER_API_KEY to use providers beyond Anthropic/Google/OpenAI, or switch to a supported model prefix (claude-*, gemini-*, gpt-*, o1*, o3*, o4*).`
+      `Unrecognized model "${id}". Set OPENROUTER_API_KEY to use providers beyond Google/OpenAI, or switch to a supported model prefix (gemini-*, gpt-*, o1*, o3*, o4*).`
     );
   }
   return openrouter(id);
@@ -97,8 +87,6 @@ export function assertProviderCredentialAvailable(
   const provider = providerTypeForModel(modelId);
   const envOk = (() => {
     switch (provider) {
-      case "anthropic":
-        return !!process.env.ANTHROPIC_API_KEY;
       case "google_ai":
         return !!(
           process.env.GEMINI_API_KEY ?? process.env.GOOGLE_GENERATIVE_AI_API_KEY
@@ -114,7 +102,6 @@ export function assertProviderCredentialAvailable(
   if (envOk) return;
 
   const settingsHint: Record<AiProviderType, string> = {
-    anthropic: "Anthropic (Claude)",
     google_ai: "Google AI (Gemini)",
     openai: "OpenAI (GPT / o-series)",
     openrouter: "OpenRouter",
@@ -126,15 +113,7 @@ export function assertProviderCredentialAvailable(
 }
 
 export function getProviderOptions(
-  modelId: string | undefined | null
+  _modelId: string | undefined | null
 ): Record<string, any> | undefined {
-  const id = (modelId ?? "").trim();
-
-  if (id.startsWith("claude-")) {
-    // Reserved hook for Anthropic-specific features (prompt caching metadata,
-    // extended thinking). Caching is usually configured per-message via
-    // `providerOptions.anthropic.cacheControl`, not at the call level.
-    return undefined;
-  }
   return undefined;
 }

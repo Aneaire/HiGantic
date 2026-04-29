@@ -5,14 +5,6 @@ import {
 
 // ── Provider icons ──────────────────────────────────────────────────────
 
-export function AnthropicIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-      <path d="M13.827 3.52h3.603L24 20.48h-3.603l-6.57-16.96zm-7.258 0h3.767L16.906 20.48h-3.674l-1.343-3.461H5.017l-1.344 3.46H0L6.57 3.522zm1.21 5.175l-2.33 6.003h4.66l-2.33-6.003z" />
-    </svg>
-  );
-}
-
 export function GoogleIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -37,16 +29,13 @@ export interface ModelEntry {
   value: string;
   label: string;
   description: string;
-  group: "Claude" | "Gemini" | "OpenAI";
+  group: "Gemini" | "OpenAI";
   tier: string;
   capabilities: ModelCapability[];
   type: "chat";
 }
 
 export const CHAT_MODELS: ModelEntry[] = [
-  { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", description: "Balanced speed and capability", group: "Claude", tier: "$$", capabilities: ["vision", "thinking"], type: "chat" },
-  { value: "claude-opus-4-6", label: "Claude Opus 4.6", description: "Most capable Claude model", group: "Claude", tier: "$$$", capabilities: ["vision", "thinking"], type: "chat" },
-  { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", description: "Fastest and most affordable", group: "Claude", tier: "$", capabilities: ["vision"], type: "chat" },
   { value: "gemini-3.1-pro-preview", label: "Gemini 3.1 Pro", description: "Most capable Gemini model", group: "Gemini", tier: "$$$", capabilities: ["vision", "thinking"], type: "chat" },
   { value: "gemini-3-flash-preview", label: "Gemini 3 Flash", description: "Lightning-fast with agentic capability", group: "Gemini", tier: "$$", capabilities: ["vision", "thinking"], type: "chat" },
   { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash", description: "Balanced Gemini model", group: "Gemini", tier: "$$", capabilities: ["vision", "thinking"], type: "chat" },
@@ -60,10 +49,8 @@ export function getModelLabel(value: string) {
 }
 
 export function getProviderIcon(group: string) {
-  if (group === "Claude") return AnthropicIcon;
-  if (group === "Gemini") return GoogleIcon;
   if (group === "OpenAI") return OpenAIIcon;
-  return AnthropicIcon;
+  return GoogleIcon;
 }
 
 // ── ModelDropdown ───────────────────────────────────────────────────────
@@ -84,7 +71,7 @@ export function ModelDropdown({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "Claude" | "Gemini" | "OpenAI">("all");
+  const [filter, setFilter] = useState<"all" | "Gemini" | "OpenAI">("all");
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const close = useCallback(() => {
@@ -135,7 +122,6 @@ export function ModelDropdown({
 
   const filterTabs: { key: typeof filter; label: string }[] = [
     { key: "all", label: "All" },
-    { key: "Claude", label: "Claude" },
     { key: "Gemini", label: "Gemini" },
     { key: "OpenAI", label: "OpenAI" },
   ];

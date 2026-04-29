@@ -16,19 +16,19 @@ This file is the primary context source for AI coding agents. Keep it optimized:
 ## Project Structure
 
 Monorepo with 3 packages:
-- `packages/agent/` — Agent execution server (Hono + Claude SDK). Runs tools, processes jobs. Has fallback polling for jobs/schedules/timers.
+- `packages/agent/` — Agent execution server (Hono + Vercel AI SDK). Runs tools, processes jobs. Has fallback polling for jobs/schedules/timers.
 - `packages/shared/` — Convex backend (schema, queries, mutations, actions). Includes `processAutomation.ts` for native automation/schedule/timer execution. Shared between agent server and web UI.
 - `packages/web/` — React Router web UI (agent management, chat, settings, pages).
 
 ## Architecture (Summary)
 
-- **Job System**: Push-based. `dispatch.notifyJobCreated` sends HTTP to agent server on job creation; server claims + runs via Claude SDK. Fallback poll every 30s.
+- **Job System**: Push-based. `dispatch.notifyJobCreated` sends HTTP to agent server on job creation; server claims + runs via Vercel AI SDK. Fallback poll every 30s.
 - **Tool System**: MCP servers with dynamic tool registration. Tools gated by `enabledToolSets` array on agent config.
 - **Event Bus**: All tool actions emit events to `agentEvents` table. Automations subscribe to events.
 - **Automation/Schedule/Timer Execution**: Runs **natively inside Convex** via `processAutomation.ts` — no HTTP to agent server needed. Agent server has a 30s fallback poll as safety net.
 - **Auth**: Clerk for users, `serverToken` for server-to-Convex auth.
 - **Credentials**: Centralized credential store (`credentials` table) with AES-256-GCM encryption. Linked to agents via `agentCredentialLinks`. Runtime falls back to legacy `agentToolConfigs` if no linked credential exists. Registry in `packages/shared/src/credential-types.ts`.
-- **Models**: Claude (Anthropic) and Gemini (Google) supported. Routed via `isGeminiModel()`.
+- **Models**: Google (Gemini), OpenAI, and OpenRouter supported via the Vercel AI SDK. Provider selection is driven by model ID prefix in `packages/agent/src/model-factory.ts`.
 
 ## TypeScript Guidelines
 
@@ -128,7 +128,7 @@ All automations, schedules, and timers execute **natively inside Convex** — no
 - **HTTP actions** (`send_email`, `fire_webhook`) → delegated to `executeHttpAction` internalAction (calls Resend API / webhook URL directly)
 - **`trigger_agent`** → calls `agentMessages.send` mutation directly (no HTTP needed)
 
-**`dispatch.ts` only exports `notifyJobCreated`** — job processing is the only thing that requires the agent server (Claude SDK runs there). Everything else runs in Convex.
+**`dispatch.ts` only exports `notifyJobCreated`** — job processing is the only thing that requires the agent server (Vercel AI SDK runs there). Everything else runs in Convex.
 
 **When adding a new automation action type:**
 1. Add the action type to `actionTypeValidator` in `automations.ts`

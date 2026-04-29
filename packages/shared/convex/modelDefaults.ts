@@ -3,11 +3,10 @@ import type { DataModel } from "./_generated/dataModel";
 import type { Id } from "./_generated/dataModel";
 
 /** AI provider credential types in priority order. */
-const AI_PROVIDER_TYPES = ["anthropic", "google_ai", "openai"] as const;
+const AI_PROVIDER_TYPES = ["google_ai", "openai"] as const;
 
 /** Maps AI provider credential types to their best default model. */
 const PROVIDER_DEFAULT_MODEL: Record<string, string> = {
-  anthropic: "claude-sonnet-4-6",
   google_ai: "gemini-2.5-flash",
   openai: "gpt-4o-mini",
 };
@@ -22,7 +21,7 @@ const FALLBACK_MODEL = "gemini-2.5-flash";
 /**
  * Picks the best default model for a user based on which AI provider
  * credentials they have configured. Returns the first available provider's
- * default model, preferring anthropic > google_ai > openai.
+ * default model, preferring google_ai > openai.
  * Falls back to gemini-2.5-flash (platform-provided Gemini key).
  */
 export async function getDefaultModelForUser(
