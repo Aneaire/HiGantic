@@ -27,7 +27,6 @@ import remarkGfm from "remark-gfm";
 const TOOL_LABELS = getToolSetLabelsMap();
 
 const PROVIDER_TO_CRED: Record<string, string> = {
-  Claude: "anthropic",
   Gemini: "google_ai",
   OpenAI: "openai",
 };
@@ -138,6 +137,7 @@ function EditorView({
   );
   const [viewingConversationId, setViewingConversationId] =
     useState<Id<"conversations"> | null>(null);
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
 
   useEffect(() => {
     if (session && session.status === "completed") {
@@ -181,19 +181,32 @@ function EditorView({
   }
 
   return (
-    <div className="flex h-screen bg-surface">
-      {/* Left: Edit History Sidebar */}
+    <div className="flex flex-1 min-h-0 bg-surface relative">
+      {/* Left: Edit History Sidebar — overlay on mobile, inline on desktop */}
       {showHistory && (
-        <EditHistorySidebar
-          sessions={pastSessions ?? []}
-          currentSessionId={sessionId}
-          viewingConversationId={viewingConversationId}
-          onSelectSession={(convId) => setViewingConversationId(convId)}
-          onClose={() => {
-            setShowHistory(false);
-            setViewingConversationId(null);
-          }}
-        />
+        <>
+          <button
+            type="button"
+            aria-label="Close history"
+            className="lg:hidden fixed inset-0 bg-ink/40 backdrop-blur-[2px] z-30"
+            onClick={() => {
+              setShowHistory(false);
+              setViewingConversationId(null);
+            }}
+          />
+          <div className="fixed lg:static inset-y-0 left-0 z-40 lg:z-auto">
+            <EditHistorySidebar
+              sessions={pastSessions ?? []}
+              currentSessionId={sessionId}
+              viewingConversationId={viewingConversationId}
+              onSelectSession={(convId) => setViewingConversationId(convId)}
+              onClose={() => {
+                setShowHistory(false);
+                setViewingConversationId(null);
+              }}
+            />
+          </div>
+        </>
       )}
 
       {/* History viewer overlay (read-only past conversation) */}
@@ -207,44 +220,55 @@ function EditorView({
       {/* Center: Chat */}
       <div className={`flex-1 flex flex-col min-w-0 ${viewingConversationId ? "hidden" : ""}`}>
         {/* Header */}
-        <div className="border-b border-rule px-6 h-14 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-4">
+        <div className="border-b border-rule px-3 sm:px-6 h-14 flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <Link
               to={`/agents/${agentId}/settings`}
-              className="inline-flex items-center gap-1 text-2xs uppercase tracking-[0.12em] font-semibold text-ink-faint hover:text-ink-muted transition-colors"
+              className="inline-flex items-center gap-1 text-2xs uppercase tracking-[0.12em] font-semibold text-ink-faint hover:text-ink-muted transition-colors shrink-0"
             >
               <ChevronLeft className="h-3 w-3" strokeWidth={1.75} />
-              Settings
+              <span className="hidden sm:inline">Settings</span>
             </Link>
-            <div className="h-4 w-px bg-rule" />
-            <div className="flex items-center gap-2">
-              <Pencil className="h-3.5 w-3.5 text-ink-muted" strokeWidth={1.5} />
-              <span className="text-sm text-ink">
-                Agent Builder{agent ? ` — ${agent.name}` : ""}
+            <div className="hidden sm:block h-4 w-px bg-rule" />
+            <div className="flex items-center gap-2 min-w-0">
+              <Pencil className="h-3.5 w-3.5 text-ink-muted shrink-0" strokeWidth={1.5} />
+              <span className="text-sm text-ink truncate">
+                <span className="hidden sm:inline">Agent Builder</span>
+                <span className="sm:hidden">Builder</span>
+                {agent ? <span className="hidden sm:inline"> — {agent.name}</span> : null}
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 sm:gap-3 shrink-0">
             <button
               onClick={handleNewChat}
-              className="inline-flex items-center gap-1.5 text-2xs uppercase tracking-[0.12em] font-semibold text-ink-muted hover:text-ink transition-colors"
+              aria-label="New chat"
+              className="inline-flex items-center gap-1.5 text-2xs uppercase tracking-[0.12em] font-semibold text-ink-muted hover:text-ink transition-colors p-1.5 sm:p-0"
             >
-              <MessageSquare className="h-3 w-3" strokeWidth={1.5} />
-              New Chat
+              <MessageSquare className="h-3.5 w-3.5 sm:h-3 sm:w-3" strokeWidth={1.5} />
+              <span className="hidden sm:inline">New Chat</span>
             </button>
             <button
               onClick={() => setShowHistory(!showHistory)}
-              className={`inline-flex items-center gap-1.5 text-2xs uppercase tracking-[0.12em] font-semibold transition-colors ${
+              aria-label="Edit history"
+              className={`inline-flex items-center gap-1.5 text-2xs uppercase tracking-[0.12em] font-semibold transition-colors p-1.5 sm:p-0 ${
                 showHistory ? "text-ink" : "text-ink-muted hover:text-ink"
               }`}
             >
-              <History className="h-3 w-3" strokeWidth={1.5} />
-              History
+              <History className="h-3.5 w-3.5 sm:h-3 sm:w-3" strokeWidth={1.5} />
+              <span className="hidden sm:inline">History</span>
               {pastSessions && pastSessions.length > 0 && (
                 <span className="font-mono text-ink-faint">
                   {pastSessions.length}
                 </span>
               )}
+            </button>
+            <button
+              onClick={() => setMobilePreviewOpen(true)}
+              aria-label="Show preview"
+              className="lg:hidden inline-flex items-center text-ink-muted hover:text-ink transition-colors p-1.5"
+            >
+              <Bot className="h-3.5 w-3.5" strokeWidth={1.5} />
             </button>
             <button
               onClick={onAbandon}
@@ -280,12 +304,34 @@ function EditorView({
         />
       </div>
 
-      {/* Right: Config Preview */}
+      {/* Right: Config Preview — drawer on mobile, inline on desktop */}
+      {!viewingConversationId && mobilePreviewOpen && (
+        <button
+          type="button"
+          aria-label="Close preview"
+          onClick={() => setMobilePreviewOpen(false)}
+          className="lg:hidden fixed inset-0 bg-ink/40 backdrop-blur-[2px] z-30"
+        />
+      )}
       {!viewingConversationId && (
-        <aside className="w-80 border-l border-rule flex flex-col shrink-0 bg-surface">
-          <div className="px-5 h-14 border-b border-rule flex items-center gap-2">
-            <Bot className="h-3.5 w-3.5 text-ink-faint" strokeWidth={1.5} />
-            <p className="eyebrow">Preview</p>
+        <aside
+          className={`fixed lg:static inset-y-0 right-0 z-40 lg:z-auto w-80 max-w-[88vw] border-l border-rule flex flex-col shrink-0 bg-surface transition-transform duration-200 lg:transition-none ${
+            mobilePreviewOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
+          }`}
+        >
+          <div className="px-5 h-14 border-b border-rule flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Bot className="h-3.5 w-3.5 text-ink-faint" strokeWidth={1.5} />
+              <p className="eyebrow">Preview</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobilePreviewOpen(false)}
+              aria-label="Close preview"
+              className="lg:hidden p-1.5 text-ink-faint hover:text-ink transition-colors"
+            >
+              <X className="h-4 w-4" strokeWidth={1.75} />
+            </button>
           </div>
           <div className="flex-1 overflow-y-auto">
 
@@ -661,7 +707,7 @@ function SystemPromptDialog({
 function ModelPreviewChip({ model }: { model?: string }) {
   if (!model) return <p className="text-sm text-ink-faint italic">Not set</p>;
   const entry = CHAT_MODELS.find((m) => m.value === model);
-  const Icon = getProviderIcon(entry?.group ?? "Claude");
+  const Icon = getProviderIcon(entry?.group ?? "Gemini");
   return (
     <div className="inline-flex items-center gap-2">
       <Icon className="h-3.5 w-3.5 text-ink-faint shrink-0" />

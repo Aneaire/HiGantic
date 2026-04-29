@@ -68,12 +68,6 @@ function ServiceIcon({ type, className = "h-4 w-4" }: { type: string; className?
       );
     case "image_gen_nano_banana":
       return <Image className={className} strokeWidth={1.5} />;
-    case "anthropic":
-      return (
-        <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
-          <path d="M13.827 3.52h3.603L24 20.48h-3.603l-6.57-16.96zm-7.258 0h3.767L16.906 20.48h-3.674l-1.343-3.461H5.017l-1.344 3.46H0L6.57 3.522zm1.21 5.175l-2.33 6.003h4.66l-2.33-6.003z" />
-        </svg>
-      );
     case "google_ai":
       return (
         <svg viewBox="0 0 24 24" fill="currentColor" className={className}>
@@ -192,10 +186,10 @@ export default function CredentialsPage() {
     <DashboardLayout>
       <div className="max-w-3xl mx-auto">
         {/* ── Header ────────────────────────────────────────────────── */}
-        <header className="flex items-start justify-between gap-8 mb-10">
+        <header className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-8 mb-8 sm:mb-10">
           <div>
             <p className="eyebrow">Access</p>
-            <h1 className="mt-3 font-display text-4xl leading-[1] tracking-tight text-ink">
+            <h1 className="mt-3 font-display text-3xl sm:text-4xl leading-[1] tracking-tight text-ink">
               Credentials
             </h1>
             <p className="mt-4 text-sm text-ink-muted max-w-lg leading-relaxed">
@@ -206,7 +200,7 @@ export default function CredentialsPage() {
           </div>
           <button
             onClick={() => setShowCreate(!showCreate)}
-            className="inline-flex items-center gap-1.5 bg-ink text-ink-inverse text-sm font-medium px-4 py-2 rounded-sm hover:bg-ink-muted transition-colors shrink-0 mt-2"
+            className="self-start inline-flex items-center gap-1.5 bg-ink text-ink-inverse text-sm font-medium px-4 py-2 rounded-sm hover:bg-ink-muted transition-colors shrink-0 sm:mt-2"
           >
             <Plus className="h-3.5 w-3.5" strokeWidth={2} />
             New credential
@@ -274,7 +268,7 @@ export default function CredentialsPage() {
               const typeDef = CREDENTIAL_TYPE_REGISTRY[cred.type];
               return (
                 <li key={cred._id} className="group">
-                  <div className="grid grid-cols-[3ch_auto_1fr_auto] gap-4 items-baseline py-5">
+                  <div className="grid grid-cols-[2ch_auto_1fr_auto] sm:grid-cols-[3ch_auto_1fr_auto] gap-2 sm:gap-4 items-baseline py-5">
                     <span className="font-mono text-2xs text-ink-faint tabular-nums self-center">
                       {String(i + 1).padStart(2, "0")}
                     </span>
@@ -283,13 +277,13 @@ export default function CredentialsPage() {
                       className="h-5 w-5 shrink-0 text-ink self-center"
                     />
                     <div className="min-w-0">
-                      <div className="flex items-baseline gap-3 flex-wrap">
-                        <h3 className="font-display text-lg leading-tight text-ink truncate">
+                      <div className="flex items-baseline gap-2 sm:gap-3 flex-wrap">
+                        <h3 className="font-display text-base sm:text-lg leading-tight text-ink truncate">
                           {cred.name}
                         </h3>
                         <StatusBadge status={cred.status} />
                       </div>
-                      <p className="mt-1 text-sm text-ink-muted">
+                      <p className="mt-1 text-sm text-ink-muted break-words">
                         {typeDef?.label ?? cred.type}
                         {cred.lastTestedAt && (
                           <>
@@ -302,7 +296,7 @@ export default function CredentialsPage() {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-1 self-center">
+                    <div className="flex items-center gap-1 self-center flex-wrap justify-end">
                       {!isEditing && typeDef && typeDef.authMethod === "oauth2" && (
                         <ReconnectButton
                           typeDef={typeDef}

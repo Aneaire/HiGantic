@@ -113,9 +113,9 @@ export default function DashboardView() {
       )}
 
       {/* ── Header row: editorial asymmetry ─────────────────────────── */}
-      <header className="flex items-start justify-between gap-8 mb-10">
+      <header className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 sm:gap-8 mb-8 sm:mb-10">
         <div>
-          <h1 className="font-display text-4xl leading-[1] tracking-tight text-ink">
+          <h1 className="font-display text-3xl sm:text-4xl leading-[1] tracking-tight text-ink">
             {getGreeting()}.
           </h1>
           {filteredAgents && (
@@ -130,7 +130,7 @@ export default function DashboardView() {
             </p>
           )}
         </div>
-        <div className="flex items-center gap-6 pt-2">
+        <div className="flex items-center gap-4 sm:gap-6 sm:pt-2 flex-wrap">
           <PlanToggle />
           <Link
             to="/agents/new"
@@ -143,8 +143,8 @@ export default function DashboardView() {
       </header>
 
       {visibleAgents && visibleAgents.length > 0 && (
-        <div className="mb-6 flex items-center justify-between gap-6 border-y border-rule py-3">
-          <div className="flex-1 max-w-sm">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-6 border-y border-rule py-3">
+          <div className="flex-1 sm:max-w-sm">
             <input
               type="text"
               value={searchQuery}
@@ -184,11 +184,11 @@ export default function DashboardView() {
       {filteredAgents === undefined ? (
         <ol className="divide-y divide-rule border-b border-rule">
           {[
-            { nameW: "w-44", modelW: "w-28", descW: "w-72" },
-            { nameW: "w-56", modelW: "w-32", descW: "w-64" },
-            { nameW: "w-36", modelW: "w-24", descW: "w-80" },
+            { nameW: "w-32 sm:w-44", modelW: "w-20 sm:w-28", descW: "w-48 sm:w-72" },
+            { nameW: "w-40 sm:w-56", modelW: "w-24 sm:w-32", descW: "w-44 sm:w-64" },
+            { nameW: "w-28 sm:w-36", modelW: "w-16 sm:w-24", descW: "w-52 sm:w-80" },
           ].map(({ nameW, modelW, descW }, i) => (
-            <li key={i} className="grid grid-cols-[3ch_1fr_auto] gap-6 items-baseline py-5 px-1">
+            <li key={i} className="grid grid-cols-[3ch_1fr_auto] gap-3 sm:gap-6 items-baseline py-5 px-1">
               {/* index: font-mono text-2xs */}
               <div className="h-[9px] w-4 bg-surface-sunken animate-pulse" />
               {/* name + model badge + description */}

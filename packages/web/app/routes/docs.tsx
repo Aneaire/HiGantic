@@ -22,8 +22,10 @@ import {
   Settings,
   Plug,
   Bot,
+  Menu,
+  X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // ── Documentation content ────────────────────────────────────────────
 
@@ -201,6 +203,12 @@ export default function DocsPage() {
   const params = useParams();
   const sectionId = params.section;
   const pageId = params.page;
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Close mobile nav when route changes
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [sectionId, pageId]);
 
   // Find current page
   let currentSection: DocSection | undefined;
@@ -221,46 +229,83 @@ export default function DocsPage() {
     }
   }
 
+  const sidebarContent = (
+    <>
+      <Link
+        to="/docs"
+        className="flex items-center gap-2 text-sm font-semibold text-ink mb-4"
+      >
+        <BookOpen className="h-4 w-4" />
+        Documentation
+      </Link>
+      {SECTIONS.map((section) => (
+        <div key={section.id}>
+          <div className="flex items-center gap-2 eyebrow mb-2">
+            {section.icon}
+            {section.title}
+          </div>
+          <ul className="space-y-0.5">
+            {section.pages.map((page) => {
+              const isActive = currentPage?.id === page.id;
+              return (
+                <li key={page.id}>
+                  <Link
+                    to={`/docs/${section.id}/${page.id}`}
+                    className={`block px-2 py-1.5 text-sm transition-colors ${
+                      isActive
+                        ? "bg-surface-sunken text-ink font-medium"
+                        : "text-ink-faint hover:text-ink-muted hover:bg-surface-sunken/60"
+                    }`}
+                  >
+                    {page.title}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+    </>
+  );
+
   return (
     <DashboardLayout>
+      {/* Mobile nav toggle */}
+      <button
+        type="button"
+        onClick={() => setMobileNavOpen(true)}
+        className="lg:hidden inline-flex items-center gap-2 text-2xs uppercase tracking-[0.12em] font-semibold text-ink-faint hover:text-ink-muted transition-colors mb-4"
+      >
+        <Menu className="h-3.5 w-3.5" strokeWidth={1.75} />
+        Browse docs
+      </button>
+
+      {/* Mobile drawer */}
+      {mobileNavOpen && (
+        <>
+          <div
+            className="lg:hidden fixed inset-0 bg-ink/40 backdrop-blur-[2px] z-40"
+            onClick={() => setMobileNavOpen(false)}
+          />
+          <aside className="lg:hidden fixed inset-y-0 left-0 z-50 w-72 max-w-[88vw] bg-surface border-r border-rule overflow-y-auto p-5">
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(false)}
+              aria-label="Close menu"
+              className="absolute top-3 right-3 p-1.5 text-ink-faint hover:text-ink transition-colors"
+            >
+              <X className="h-4 w-4" strokeWidth={1.75} />
+            </button>
+            <div className="space-y-6 mt-6">{sidebarContent}</div>
+          </aside>
+        </>
+      )}
+
       <div className="flex gap-8 max-w-6xl mx-auto">
-        {/* Sidebar */}
+        {/* Desktop Sidebar */}
         <aside className="w-64 shrink-0 hidden lg:block">
           <div className="sticky top-20 space-y-6 overflow-y-auto max-h-[calc(100vh-6rem)]">
-            <Link
-              to="/docs"
-              className="flex items-center gap-2 text-sm font-semibold text-ink mb-4"
-            >
-              <BookOpen className="h-4 w-4" />
-              Documentation
-            </Link>
-            {SECTIONS.map((section) => (
-              <div key={section.id}>
-                <div className="flex items-center gap-2 eyebrow mb-2">
-                  {section.icon}
-                  {section.title}
-                </div>
-                <ul className="space-y-0.5">
-                  {section.pages.map((page) => {
-                    const isActive = currentPage?.id === page.id;
-                    return (
-                      <li key={page.id}>
-                        <Link
-                          to={`/docs/${section.id}/${page.id}`}
-                          className={`block px-2 py-1.5 text-sm transition-colors ${
-                            isActive
-                              ? "bg-surface-sunken text-ink font-medium"
-                              : "text-ink-faint hover:text-ink-muted hover:bg-surface-sunken/60"
-                          }`}
-                        >
-                          {page.title}
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
+            {sidebarContent}
           </div>
         </aside>
 

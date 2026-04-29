@@ -113,9 +113,9 @@ export default function SettingsPage() {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="max-w-2xl mx-auto px-8 py-10 space-y-8">
+      <div className="max-w-2xl mx-auto px-4 sm:px-8 py-6 sm:py-10 space-y-6 sm:space-y-8">
         {/* Section header */}
-        <div className="flex items-baseline justify-between border-b border-rule pb-4">
+        <div className="flex items-baseline justify-between gap-3 border-b border-rule pb-4">
           <div>
             <p className="eyebrow">Settings</p>
             <h1 className="mt-1 font-display text-2xl text-ink">
@@ -148,7 +148,7 @@ export default function SettingsPage() {
             {(agent.enabledToolSets ?? [])
               .filter((ts) => TOOL_SETS_REQUIRING_CREDENTIALS[ts])
               .map((ts) => (
-                <section key={ts} className="border border-rule p-6 bg-surface">
+                <section key={ts} className="border border-rule p-4 sm:p-6 bg-surface">
                   <p className="eyebrow mb-4">
                     {getToolSetLabel(ts)} Credentials
                   </p>
@@ -215,7 +215,7 @@ function AgentIconSection({ agent }: { agent: Doc<"agents"> }) {
   }
 
   return (
-    <section className="border border-rule p-6 bg-surface">
+    <section className="border border-rule p-4 sm:p-6 bg-surface">
       <p className="eyebrow mb-4">Agent Icon</p>
       <div className="flex items-center gap-4">
         {agent.iconUrl ? (
@@ -293,7 +293,7 @@ function AgentConfigSection({ agent }: { agent: Doc<"agents"> }) {
 
   return (
     <>
-      <section className="border border-rule p-6 bg-surface">
+      <section className="border border-rule p-4 sm:p-6 bg-surface">
         <div className="flex items-baseline justify-between mb-6">
           <p className="eyebrow">Agent Configuration</p>
           {hasChanges && (
@@ -612,27 +612,6 @@ function SystemPromptDialog({
 
 const ALL_MODELS = [
   {
-    id: "claude-sonnet-4-6",
-    name: "Claude Sonnet 4.6",
-    description: "Balanced speed and capability",
-    provider: "Anthropic",
-    tier: "$$",
-  },
-  {
-    id: "claude-opus-4-6",
-    name: "Claude Opus 4.6",
-    description: "Most capable Claude model",
-    provider: "Anthropic",
-    tier: "$$$",
-  },
-  {
-    id: "claude-haiku-4-5-20251001",
-    name: "Claude Haiku 4.5",
-    description: "Fastest and most affordable",
-    provider: "Anthropic",
-    tier: "$",
-  },
-  {
     id: "gemini-3.1-pro-preview",
     name: "Gemini 3.1 Pro",
     description: "Most capable Gemini model",
@@ -681,7 +660,6 @@ function EnabledModelsSection({ agent }: { agent: Doc<"agents"> }) {
 
   const aiProviders = useQuery(api.credentials.listAiProviders);
   const PROVIDER_TO_CRED: Record<string, string> = {
-    Anthropic: "anthropic",
     Google: "google_ai",
     OpenAI: "openai",
   };

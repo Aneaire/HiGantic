@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { ChevronLeft, User, Cpu, ToggleRight, Plug, Wrench } from "lucide-react";
+import { ChevronLeft, User, Cpu, ToggleRight, Plug, Wrench, X } from "lucide-react";
 import type { Doc } from "@agent-maker/shared/convex/_generated/dataModel";
 
 const SETTINGS_SECTIONS = [
@@ -39,14 +39,26 @@ export function SettingsSidebar({
   agent,
   activeSection,
   onSectionChange,
+  onCloseMobile,
 }: {
   agent: Doc<"agents">;
   activeSection: string;
   onSectionChange: (section: string) => void;
+  onCloseMobile?: () => void;
 }) {
   return (
-    <aside className="w-64 border-r border-rule flex flex-col bg-surface shrink-0">
-      <div className="px-5 pt-6 pb-5 border-b border-rule">
+    <aside className="w-72 sm:w-64 h-screen border-r border-rule flex flex-col bg-surface shrink-0">
+      <div className="px-5 pt-6 pb-5 border-b border-rule relative">
+        {onCloseMobile && (
+          <button
+            type="button"
+            onClick={onCloseMobile}
+            aria-label="Close menu"
+            className="lg:hidden absolute top-3 right-3 p-1.5 text-ink-faint hover:text-ink transition-colors"
+          >
+            <X className="h-4 w-4" strokeWidth={1.75} />
+          </button>
+        )}
         <Link
           to={`/agents/${agent._id}`}
           className="inline-flex items-center gap-1 text-2xs uppercase tracking-[0.12em] font-semibold text-ink-faint hover:text-ink-muted transition-colors group mb-4"

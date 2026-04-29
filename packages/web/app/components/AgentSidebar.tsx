@@ -81,7 +81,13 @@ function navRowClass(isActive: boolean) {
   }`;
 }
 
-export function AgentSidebar({ agent }: { agent: Doc<"agents"> }) {
+export function AgentSidebar({
+  agent,
+  onCloseMobile,
+}: {
+  agent: Doc<"agents">;
+  onCloseMobile?: () => void;
+}) {
   const { conversationId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
@@ -198,9 +204,19 @@ export function AgentSidebar({ agent }: { agent: Doc<"agents"> }) {
   const assetsActive = location.pathname.includes("/assets");
 
   return (
-    <aside className="w-64 border-r border-rule flex flex-col bg-surface shrink-0">
+    <aside className="w-72 sm:w-64 h-screen border-r border-rule flex flex-col bg-surface shrink-0">
       {/* ── Agent header ──────────────────────────────────────────── */}
-      <div className="px-4 pt-5 pb-4 border-b border-rule">
+      <div className="px-4 pt-5 pb-4 border-b border-rule relative">
+        {onCloseMobile && (
+          <button
+            type="button"
+            onClick={onCloseMobile}
+            aria-label="Close menu"
+            className="lg:hidden absolute top-3 right-3 p-1.5 text-ink-faint hover:text-ink transition-colors"
+          >
+            <X className="h-4 w-4" strokeWidth={1.75} />
+          </button>
+        )}
         <Link
           to="/"
           className="inline-flex items-center gap-1 text-2xs uppercase tracking-[0.12em] font-semibold text-ink-faint hover:text-ink-muted transition-colors group mb-3"

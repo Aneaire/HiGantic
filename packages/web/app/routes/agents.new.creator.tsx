@@ -4,7 +4,7 @@ import { useNavigate, Link } from "react-router";
 import { useState, useEffect, useRef } from "react";
 import { ChatMessageList } from "~/components/ChatMessageList";
 import { ChatInput } from "~/components/ChatInput";
-import { ChevronLeft, Loader2, Upload } from "lucide-react";
+import { ChevronLeft, Loader2, Upload, Bot, X } from "lucide-react";
 import type { Id } from "@agent-maker/shared/convex/_generated/dataModel";
 import { getToolSetLabelsMap } from "@agent-maker/shared/src/tool-set-registry";
 import { CHAT_MODELS, getProviderIcon } from "~/components/ModelDropdown";
@@ -12,7 +12,6 @@ import { CHAT_MODELS, getProviderIcon } from "~/components/ModelDropdown";
 const TOOL_LABELS = getToolSetLabelsMap();
 
 const PROVIDER_TO_CRED: Record<string, string> = {
-  Claude: "anthropic",
   Gemini: "google_ai",
   OpenAI: "openai",
 };
@@ -131,31 +130,41 @@ function CreatorView({
   }
 
   const config = (session?.partialConfig as any) ?? {};
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-surface">
+    <div className="flex h-screen bg-surface relative">
       {/* ── Left: Chat ─────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0">
-        <div className="border-b border-rule px-6 h-14 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-4">
+        <div className="border-b border-rule px-3 sm:px-6 h-14 flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <Link
               to="/agents/new"
-              className="inline-flex items-center gap-1 text-2xs uppercase tracking-[0.12em] font-semibold text-ink-faint hover:text-ink-muted transition-colors"
+              className="inline-flex items-center gap-1 text-2xs uppercase tracking-[0.12em] font-semibold text-ink-faint hover:text-ink-muted transition-colors shrink-0"
             >
               <ChevronLeft className="h-3 w-3" strokeWidth={1.75} />
               Back
             </Link>
-            <div className="h-4 w-px bg-rule" />
-            <div>
-              <p className="eyebrow leading-none">Agent Builder</p>
+            <div className="hidden sm:block h-4 w-px bg-rule" />
+            <div className="min-w-0">
+              <p className="eyebrow leading-none truncate">Agent Builder</p>
             </div>
           </div>
-          <button
-            onClick={onAbandon}
-            className="text-sm text-ink-muted hover:text-ink transition-colors"
-          >
-            Cancel
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setMobilePreviewOpen(true)}
+              aria-label="Show preview"
+              className="lg:hidden inline-flex items-center text-ink-muted hover:text-ink transition-colors p-1.5"
+            >
+              <Bot className="h-3.5 w-3.5" strokeWidth={1.5} />
+            </button>
+            <button
+              onClick={onAbandon}
+              className="text-sm text-ink-muted hover:text-ink transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
 
         {messages === undefined ? (
@@ -188,10 +197,30 @@ function CreatorView({
         />
       </div>
 
-      {/* ── Right: Agent preview ───────────────────────────────── */}
-      <aside className="w-80 border-l border-rule flex flex-col shrink-0 bg-surface">
-        <div className="px-5 h-14 border-b border-rule flex items-center">
+      {/* ── Right: Agent preview — drawer on mobile, inline on desktop ── */}
+      {mobilePreviewOpen && (
+        <button
+          type="button"
+          aria-label="Close preview"
+          onClick={() => setMobilePreviewOpen(false)}
+          className="lg:hidden fixed inset-0 bg-ink/40 backdrop-blur-[2px] z-30"
+        />
+      )}
+      <aside
+        className={`fixed lg:static inset-y-0 right-0 z-40 lg:z-auto w-80 max-w-[88vw] border-l border-rule flex flex-col shrink-0 bg-surface transition-transform duration-200 lg:transition-none ${
+          mobilePreviewOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"
+        }`}
+      >
+        <div className="px-5 h-14 border-b border-rule flex items-center justify-between gap-2">
           <p className="eyebrow">Preview</p>
+          <button
+            type="button"
+            onClick={() => setMobilePreviewOpen(false)}
+            aria-label="Close preview"
+            className="lg:hidden p-1.5 text-ink-faint hover:text-ink transition-colors"
+          >
+            <X className="h-4 w-4" strokeWidth={1.75} />
+          </button>
         </div>
         <div className="flex-1 overflow-y-auto">
 
@@ -311,7 +340,7 @@ function IconUpload({
 function ModelPreviewChip({ model }: { model?: string }) {
   if (!model) return <p className="text-sm text-ink-faint italic">Not set</p>;
   const entry = CHAT_MODELS.find((m) => m.value === model);
-  const Icon = getProviderIcon(entry?.group ?? "Claude");
+  const Icon = getProviderIcon(entry?.group ?? "Gemini");
   return (
     <div className="inline-flex items-center gap-2">
       <Icon className="h-3.5 w-3.5 text-ink-faint shrink-0" />

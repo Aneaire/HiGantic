@@ -97,19 +97,20 @@ export default function ChatPage() {
   return (
     <div className="flex-1 flex flex-col min-h-0">
       {/* Header */}
-      <div className="border-b border-rule px-8 py-4 flex items-center justify-between shrink-0">
+      <div className="border-b border-rule px-4 sm:px-8 py-3 sm:py-4 flex items-center justify-between gap-3 shrink-0">
         <div className="min-w-0">
           <p className="eyebrow">{agent.name}</p>
-          <h2 className="mt-1 font-display text-lg leading-tight text-ink truncate">
+          <h2 className="mt-1 font-display text-base sm:text-lg leading-tight text-ink truncate">
             {conversation.title || "New conversation"}
           </h2>
         </div>
         <Link
           to={`/agents/${agent._id}/editor`}
-          className="inline-flex items-center gap-1.5 text-2xs uppercase tracking-[0.12em] font-semibold text-ink-muted hover:text-ink transition-colors"
+          className="inline-flex items-center gap-1.5 text-2xs uppercase tracking-[0.12em] font-semibold text-ink-muted hover:text-ink transition-colors shrink-0"
         >
           <Pencil className="h-3 w-3" strokeWidth={1.5} />
-          Edit with AI
+          <span className="hidden sm:inline">Edit with AI</span>
+          <span className="sm:hidden">Edit</span>
         </Link>
       </div>
 

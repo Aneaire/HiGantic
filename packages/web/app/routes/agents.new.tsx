@@ -38,7 +38,7 @@ export default function NewAgentPage() {
     <div className="min-h-screen bg-surface text-ink">
       {/* ── Header ───────────────────────────────────────────────── */}
       <div className="border-b border-rule">
-        <div className="max-w-[1100px] mx-auto px-8 h-14 flex items-center gap-4">
+        <div className="max-w-[1100px] mx-auto px-4 sm:px-8 h-14 flex items-center gap-4">
           <Link
             to="/"
             className="inline-flex items-center gap-1 text-2xs uppercase tracking-[0.12em] font-semibold text-ink-faint hover:text-ink-muted transition-colors"
@@ -49,11 +49,11 @@ export default function NewAgentPage() {
         </div>
       </div>
 
-      <div className="max-w-[1100px] mx-auto px-8 py-16">
+      <div className="max-w-[1100px] mx-auto px-4 sm:px-8 py-10 sm:py-16">
         {/* ── Title ─────────────────────────────────────────────── */}
-        <header className="max-w-xl mb-16">
+        <header className="max-w-xl mb-10 sm:mb-16">
           <p className="eyebrow">New</p>
-          <h1 className="mt-3 font-display text-4xl leading-[1] tracking-tight text-ink">
+          <h1 className="mt-3 font-display text-3xl sm:text-4xl leading-[1] tracking-tight text-ink">
             Create an agent.
           </h1>
           <p className="mt-4 text-base text-ink-muted leading-relaxed">
@@ -65,14 +65,14 @@ export default function NewAgentPage() {
         {/* ── Build with AI — primary call ──────────────────────── */}
         <Link
           to="/agents/new/creator"
-          className="group block border-y border-rule-strong py-8 mb-16 hover:bg-surface-sunken/60 transition-colors"
+          className="group block border-y border-rule-strong py-6 sm:py-8 mb-10 sm:mb-16 hover:bg-surface-sunken/60 transition-colors"
         >
-          <div className="grid grid-cols-[auto_1fr_auto] gap-8 items-baseline">
+          <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr_auto] gap-3 sm:gap-8 sm:items-baseline">
             <span className="font-mono text-2xs uppercase tracking-[0.12em] text-accent">
               Recommended
             </span>
             <div>
-              <h2 className="font-display text-3xl leading-tight text-ink">
+              <h2 className="font-display text-2xl sm:text-3xl leading-tight text-ink">
                 Build with AI.
               </h2>
               <p className="mt-2 text-sm text-ink-muted leading-relaxed max-w-lg">
@@ -124,7 +124,7 @@ export default function NewAgentPage() {
                   <button
                     onClick={() => handleTemplateSelect(template)}
                     disabled={creating !== null}
-                    className="group w-full text-left grid grid-cols-[3ch_1fr_auto] gap-6 items-baseline py-5 hover:bg-surface-sunken/60 transition-colors disabled:opacity-50 disabled:cursor-wait"
+                    className="group w-full text-left grid grid-cols-[3ch_1fr_auto] gap-3 sm:gap-6 items-baseline py-5 hover:bg-surface-sunken/60 transition-colors disabled:opacity-50 disabled:cursor-wait"
                   >
                     <span className="font-mono text-2xs text-ink-faint tabular-nums">
                       {String(i + 1).padStart(2, "0")}

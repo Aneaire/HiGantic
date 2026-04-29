@@ -76,7 +76,7 @@ export function AgentCard({
       >
         <Link
           to={`/agents/${agent._id}`}
-          className="grid grid-cols-[3ch_1fr_auto] gap-6 items-baseline py-5 px-1 hover:bg-surface-sunken/60 transition-colors"
+          className="grid grid-cols-[3ch_1fr_auto] gap-3 sm:gap-6 items-baseline py-5 px-1 hover:bg-surface-sunken/60 transition-colors"
         >
           <span className="font-mono text-2xs text-ink-faint tabular-nums">
             {index !== undefined ? String(index).padStart(2, "0") : ""}
