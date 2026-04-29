@@ -35,7 +35,7 @@ export function meta(_args: Route.MetaArgs) {
     {
       name: "description",
       content:
-        "Build autonomous AI agents with persistent memory, tools, and automations. Powered by Claude and Gemini.",
+        "Build autonomous AI agents with persistent memory, tools, and automations. Powered by Gemini and OpenAI.",
     },
   ];
 }
@@ -79,6 +79,21 @@ function LandingPage() {
   );
 }
 
+/* ── Media query hook (SSR-safe; defaults to false until mounted) ──── */
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    setMatches(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setMatches(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [query]);
+
+  return matches;
+}
+
 /* ── Intersection observer ──────────────────────────────────────────── */
 function useInView(threshold = 0.15) {
   const ref = useRef<HTMLDivElement>(null);
@@ -112,7 +127,6 @@ const COPYRIGHT_YEAR = new Date().getFullYear();
  * See CLAUDE.md / AGENTS.md for the full checklist when adding a model.
  */
 const SUPPORTED_MODELS = [
-  { name: "Claude", color: "text-neon-400" },
   { name: "Gemini", color: "text-blue-400" },
   { name: "OpenAI", color: "text-green-400" },
 ];
@@ -135,7 +149,7 @@ function LandingNav() {
           : "bg-transparent border-transparent"
       }`}
     >
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-5 sm:px-6 h-16 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2.5 text-sm font-semibold tracking-tight">
           <div className="h-8 w-8 rounded-lg bg-neon-400/10 ring-1 ring-neon-400/25 overflow-hidden flex items-center justify-center">
             <img src="/logo.png" alt="HiGantic" className="h-5 w-5 object-contain" />
@@ -165,26 +179,32 @@ function LandingNav() {
 
 /* ── Hero — Immersive Three.js background ───────────────────────────── */
 function Hero() {
+  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const isLargeDesktop = useMediaQuery("(min-width: 1024px)");
+
   return (
-    <section className="relative min-h-[100vh] flex items-center overflow-hidden">
-      {/* ── Three.js Scene — full bleed background ── */}
+    <section className="relative min-h-[100vh] min-h-[100svh] flex items-center overflow-hidden">
+      {/* ── Three.js Scene — desktop only, mobile gets a static gradient ── */}
       <div className="absolute inset-0 z-0">
-        <Suspense fallback={
-          <div className="absolute inset-0 bg-zinc-950">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-neon-400/[0.04] blur-[180px] rounded-full" />
-            <div className="absolute top-20 right-0 w-[500px] h-[400px] bg-blue-500/[0.025] blur-[150px] rounded-full" />
-          </div>
-        }>
-          <HeroScene />
-        </Suspense>
+        <div className="absolute inset-0 bg-zinc-950">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] bg-neon-400/[0.04] blur-[180px] rounded-full" />
+          <div className="absolute top-20 right-0 w-[500px] h-[400px] bg-blue-500/[0.025] blur-[150px] rounded-full" />
+        </div>
+        {isDesktop && (
+          <Suspense fallback={null}>
+            <HeroScene />
+          </Suspense>
+        )}
       </div>
 
-      {/* ── Integration network overlay — logo bubbles + connections ── */}
-      <div className="absolute inset-0 z-[1] hidden lg:block">
-        <Suspense fallback={null}>
-          <IntegrationNetwork />
-        </Suspense>
-      </div>
+      {/* ── Integration network overlay — large desktop only ── */}
+      {isLargeDesktop && (
+        <div className="absolute inset-0 z-[1]">
+          <Suspense fallback={null}>
+            <IntegrationNetwork />
+          </Suspense>
+        </div>
+      )}
 
       {/* ── Gradient overlays for text readability ── */}
       <div className="absolute inset-0 bg-gradient-to-r from-zinc-950/95 via-zinc-950/60 to-zinc-950/20 z-[2] pointer-events-none" />
@@ -192,10 +212,10 @@ function Hero() {
       <div className="absolute top-0 left-0 right-0 h-24 bg-gradient-to-b from-zinc-950/80 to-transparent z-[2] pointer-events-none" />
 
       {/* ── Content ── */}
-      <div className="relative z-[3] max-w-7xl mx-auto px-6 pt-24 pb-20 w-full">
+      <div className="relative z-[3] max-w-7xl mx-auto px-5 sm:px-6 pt-24 pb-16 sm:pb-20 w-full">
         <div className="max-w-2xl">
           <h1
-            className="text-[clamp(2.8rem,7vw,5rem)] font-bold leading-[1.05] tracking-tight fade-in-up-slow"
+            className="text-[clamp(2.25rem,8vw,5rem)] font-bold leading-[1.05] tracking-tight fade-in-up-slow"
             style={{ animationDelay: "0.1s" }}
           >
             Your ideas deserve
@@ -240,7 +260,7 @@ function Hero() {
 
           {/* Quick stats */}
           <div
-            className="flex items-center gap-8 mt-14 fade-in-up-slow"
+            className="grid grid-cols-3 gap-3 sm:flex sm:items-center sm:gap-8 mt-12 sm:mt-14 fade-in-up-slow"
             style={{ animationDelay: "0.4s" }}
           >
             {[
@@ -248,19 +268,19 @@ function Hero() {
               { value: "< 2min", label: "To deploy" },
               { value: "24/7", label: "Autonomous" },
             ].map((stat, i) => (
-              <div key={stat.label} className="flex items-center gap-8">
+              <div key={stat.label} className="flex items-center sm:gap-8">
                 <div className="text-left">
-                  <div className="text-xl font-bold text-zinc-100">{stat.value}</div>
-                  <div className="text-xs text-zinc-500 mt-0.5">{stat.label}</div>
+                  <div className="text-lg sm:text-xl font-bold text-zinc-100">{stat.value}</div>
+                  <div className="text-[11px] sm:text-xs text-zinc-500 mt-0.5">{stat.label}</div>
                 </div>
-                {i < 2 && <div className="w-px h-8 bg-zinc-800" />}
+                {i < 2 && <div className="hidden sm:block w-px h-8 bg-zinc-800" />}
               </div>
             ))}
           </div>
 
           {/* Social proof */}
           <div
-            className="mt-10 flex items-center gap-3 fade-in-up-slow"
+            className="mt-8 sm:mt-10 flex items-center gap-3 fade-in-up-slow"
             style={{ animationDelay: "0.5s" }}
           >
             <div className="flex -space-x-2">
@@ -335,7 +355,7 @@ function WhatItDoes() {
   const { ref, inView } = useInView(0.08);
 
   return (
-    <section id="what" ref={ref} className="relative max-w-7xl mx-auto px-6 py-28 md:py-36">
+    <section id="what" ref={ref} className="relative max-w-7xl mx-auto px-5 sm:px-6 py-24 sm:py-28 md:py-36">
       {/* Section header */}
       <div className="text-center mb-20">
         <p
@@ -378,10 +398,10 @@ function WhatItDoes() {
             ].map((m, i) => (
               <div
                 key={i}
-                className="flex items-start gap-2 rounded-lg bg-zinc-950/60 border border-zinc-800/30 px-3 py-2"
+                className="flex flex-wrap items-start gap-x-2 gap-y-1 rounded-lg bg-zinc-950/60 border border-zinc-800/30 px-3 py-2"
               >
                 <span className={`${m.color} shrink-0 mt-px`}>[{m.cat}]</span>
-                <span className="text-zinc-500">{m.val}</span>
+                <span className="text-zinc-500 break-words min-w-0">{m.val}</span>
               </div>
             ))}
           </div>
@@ -465,11 +485,11 @@ function WhatItDoes() {
               { trigger: "on", event: "email.received", arrow: "→", action: "store_memory → create_task", color: "text-amber-400/60" },
               { trigger: "cron", event: "0 9 * * 1", arrow: "→", action: "weekly_report", color: "text-cyan-400/60" },
             ].map((row, i) => (
-              <div key={i} className="flex items-center gap-2 rounded-lg bg-zinc-950/60 border border-zinc-800/30 px-3 py-2 text-zinc-600">
+              <div key={i} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-zinc-950/60 border border-zinc-800/30 px-3 py-2 text-zinc-600">
                 <span className={row.color}>{row.trigger}</span>
-                <span className="text-zinc-500">{row.event}</span>
+                <span className="text-zinc-500 break-all">{row.event}</span>
                 <span className="text-zinc-700">{row.arrow}</span>
-                <span className="text-zinc-400">{row.action}</span>
+                <span className="text-zinc-400 break-all">{row.action}</span>
               </div>
             ))}
           </div>
@@ -509,7 +529,7 @@ function FeatureCard({
 
   return (
     <div
-      className={`group relative rounded-2xl border border-zinc-800/50 bg-zinc-900/20 p-6 md:p-8 transition-all duration-700 hover:border-zinc-700/60 hover:bg-zinc-900/30 hover:shadow-2xl ${glowMap[accentColor]} ${
+      className={`group relative rounded-2xl border border-zinc-800/50 bg-zinc-900/20 p-5 sm:p-6 md:p-8 transition-all duration-700 hover:border-zinc-700/60 hover:bg-zinc-900/30 hover:shadow-2xl ${glowMap[accentColor]} ${
         inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
       }`}
       style={{ transitionDelay: `${delay}ms` }}
@@ -573,7 +593,7 @@ function ShowDontTell() {
       title: "Your agent goes live instantly",
       body: "Deployed with its own workspace, conversation history, memory store, and pages. Chat with it, run automations, or expose it as an API.",
       visual: (
-        <div className="flex items-center gap-4 text-[12px] font-mono">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[12px] font-mono">
           <div className="flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-neon-400 status-pulse" />
             <span className="text-neon-400/80">active</span>
@@ -581,14 +601,14 @@ function ShowDontTell() {
           <div className="h-3 w-px bg-zinc-800" />
           <span className="text-zinc-500">3 pages</span>
           <div className="h-3 w-px bg-zinc-800" />
-          <span className="text-zinc-500">cron: 0 9 * * *</span>
+          <span className="text-zinc-500 break-all">cron: 0 9 * * *</span>
         </div>
       ),
     },
   ];
 
   return (
-    <section id="how" ref={ref} className="relative max-w-7xl mx-auto px-6 py-28 md:py-36">
+    <section id="how" ref={ref} className="relative max-w-7xl mx-auto px-5 sm:px-6 py-24 sm:py-28 md:py-36">
       {/* Header */}
       <div className="text-center mb-20">
         <p
@@ -613,29 +633,29 @@ function ShowDontTell() {
       {/* Timeline */}
       <div className="relative max-w-3xl mx-auto">
         {/* Vertical connector */}
-        <div className="absolute left-6 md:left-8 top-0 bottom-0 w-px bg-gradient-to-b from-neon-400/30 via-zinc-800/40 to-transparent" />
+        <div className="absolute left-5 md:left-8 top-0 bottom-0 w-px bg-gradient-to-b from-neon-400/30 via-zinc-800/40 to-transparent" />
 
-        <div className="space-y-16">
+        <div className="space-y-12 sm:space-y-16">
           {steps.map((step, i) => (
             <div
               key={step.n}
-              className={`relative flex gap-6 md:gap-10 transition-all duration-700 ${
+              className={`relative flex gap-4 sm:gap-6 md:gap-10 transition-all duration-700 ${
                 inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
               }`}
               style={{ transitionDelay: `${200 + i * 150}ms` }}
             >
               {/* Step marker */}
               <div className="shrink-0 relative z-10">
-                <div className="h-12 w-12 md:h-16 md:w-16 rounded-2xl border border-zinc-800/60 bg-zinc-900/60 backdrop-blur-sm flex items-center justify-center">
-                  <span className="text-sm md:text-base font-bold text-zinc-500">{step.n}</span>
+                <div className="h-10 w-10 sm:h-12 sm:w-12 md:h-16 md:w-16 rounded-2xl border border-zinc-800/60 bg-zinc-900/60 backdrop-blur-sm flex items-center justify-center">
+                  <span className="text-xs sm:text-sm md:text-base font-bold text-zinc-500">{step.n}</span>
                 </div>
               </div>
 
               {/* Content */}
-              <div className="flex-1 pt-1">
-                <h3 className="text-lg md:text-xl font-semibold text-zinc-200 mb-2">{step.title}</h3>
+              <div className="flex-1 min-w-0 pt-1">
+                <h3 className="text-base sm:text-lg md:text-xl font-semibold text-zinc-200 mb-2">{step.title}</h3>
                 <p className="text-[13px] text-zinc-500 leading-relaxed mb-5 max-w-lg">{step.body}</p>
-                <div className="rounded-xl border border-zinc-800/40 bg-zinc-900/20 p-4">
+                <div className="rounded-xl border border-zinc-800/40 bg-zinc-900/20 p-3 sm:p-4 overflow-hidden">
                   {step.visual}
                 </div>
               </div>
@@ -663,12 +683,12 @@ function ToolTape() {
     { icon: Shield, name: "Credentials", desc: "AES-256 encrypted vault", color: "group-hover:text-emerald-400" },
     { icon: Database, name: "RAG", desc: "Vector search on documents", color: "group-hover:text-violet-400" },
     { icon: Puzzle, name: "Custom Tools", desc: "Your own HTTP endpoints", color: "group-hover:text-pink-400" },
-    { icon: Cpu, name: "Multi-Model", desc: "Claude, Gemini & more", color: "group-hover:text-teal-400" },
+    { icon: Cpu, name: "Multi-Model", desc: "Gemini, OpenAI & more", color: "group-hover:text-teal-400" },
   ];
 
   return (
-    <section id="tools" ref={ref} className="py-28 md:py-36 border-t border-zinc-800/20">
-      <div className="max-w-7xl mx-auto px-6">
+    <section id="tools" ref={ref} className="py-24 sm:py-28 md:py-36 border-t border-zinc-800/20">
+      <div className="max-w-7xl mx-auto px-5 sm:px-6">
         {/* Header */}
         <div className="text-center mb-16">
           <p
@@ -770,7 +790,7 @@ function Pricing() {
   ];
 
   return (
-    <section id="pricing" ref={ref} className="max-w-7xl mx-auto px-6 py-28 md:py-36">
+    <section id="pricing" ref={ref} className="max-w-7xl mx-auto px-5 sm:px-6 py-24 sm:py-28 md:py-36">
       <div className="text-center mb-16">
         <p
           className={`text-[11px] font-mono uppercase tracking-[0.2em] text-neon-400/70 mb-4 transition-all duration-700 ${
@@ -864,20 +884,20 @@ function BottomCTA() {
         <CTARings />
       </div>
 
-      <div className="relative max-w-7xl mx-auto px-6 py-28 md:py-36">
+      <div className="relative max-w-7xl mx-auto px-5 sm:px-6 py-24 sm:py-28 md:py-36">
         <div
           className={`max-w-2xl mx-auto text-center transition-all duration-700 ${
             inView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
           }`}
         >
-          <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-5">
+          <h2 className="text-[clamp(1.875rem,7vw,3rem)] md:text-5xl font-bold tracking-tight mb-5">
             Stop configuring.
             <br />
             <span className="bg-gradient-to-r from-neon-400 via-neon-300 to-emerald-300 bg-clip-text text-transparent">
               Start shipping agents.
             </span>
           </h2>
-          <p className="text-zinc-500 text-lg mb-10 max-w-md mx-auto">
+          <p className="text-zinc-400 text-base sm:text-lg mb-10 max-w-md mx-auto">
             Free to start. No credit card. Your first agent is a conversation away.
           </p>
           <SignInButton mode="modal">
@@ -926,7 +946,7 @@ function CTARings() {
 function Footer() {
   return (
     <footer className="border-t border-zinc-800/20">
-      <div className="max-w-7xl mx-auto px-6 py-12">
+      <div className="max-w-7xl mx-auto px-5 sm:px-6 py-10 sm:py-12">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-center gap-2.5 text-sm text-zinc-600">
             <div className="h-6 w-6 rounded-md bg-neon-400/10 ring-1 ring-neon-400/20 overflow-hidden flex items-center justify-center">
@@ -935,7 +955,7 @@ function Footer() {
             <span>&copy; {COPYRIGHT_YEAR} HiGantic</span>
           </div>
 
-          <div className="flex items-center gap-6 text-[13px] text-zinc-600">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[13px] text-zinc-600">
             <Link to="/docs" className="hover:text-zinc-300 transition-colors">Docs</Link>
             <a href="#pricing" className="hover:text-zinc-300 transition-colors">Pricing</a>
             <a href="#" className="hover:text-zinc-300 transition-colors">Privacy</a>
