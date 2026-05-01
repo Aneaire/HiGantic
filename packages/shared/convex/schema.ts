@@ -647,6 +647,19 @@ export default defineSchema({
     .index("by_credential", ["credentialId"])
     .index("by_agent_toolset", ["agentId", "toolSetName"]),
 
+  // ── Platform Config (Admin) ──────────────────────────────────────────
+
+  platformConfig: defineTable({
+    providerDefaults: v.object({
+      anthropic: v.string(),
+      google_ai: v.string(),
+      openai: v.string(),
+    }),
+    fallbackModel: v.string(),
+    updatedAt: v.number(),
+    updatedBy: v.string(),
+  }),
+
   oauthStates: defineTable({
     userId: v.id("users"),
     state: v.string(),
