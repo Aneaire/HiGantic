@@ -31,7 +31,7 @@ const DashboardView = lazy(() => import("~/components/DashboardView"));
 
 export function meta(_args: Route.MetaArgs) {
   return [
-    { title: "HiGantic — AI Agents That Think, Remember, and Act" },
+    { title: "HiGantic - AI Agents That Think, Remember, and Act" },
     {
       name: "description",
       content:
@@ -212,7 +212,7 @@ function Hero() {
             style={{ animationDelay: "0.2s" }}
           >
             Build AI agents that remember context, use 50+ tools,
-            browse the web, manage tasks, and run automations — all through conversation.
+            browse the web, manage tasks, and run automations, all through conversation.
           </p>
 
           <div
@@ -425,7 +425,7 @@ function WhatItDoes() {
           iconColor="text-purple-400"
           label="Pages"
           title="A workspace per agent"
-          desc="Kanban tasks, markdown notes, spreadsheets, data tables — agents create and manage them autonomously."
+          desc="Kanban tasks, markdown notes, spreadsheets, data tables. Agents create and manage them autonomously."
           accentColor="purple"
         >
           <div className="mt-5 flex gap-2">
@@ -536,7 +536,7 @@ function ShowDontTell() {
     {
       n: "01",
       title: "Describe your agent in plain language",
-      body: "Talk to the creator agent. Describe what you need — it asks clarifying questions, suggests tools, and builds your agent through conversation.",
+      body: "Talk to the creator agent. Describe what you need. It asks clarifying questions, suggests tools, and builds your agent through conversation.",
       visual: (
         <div className="space-y-2 text-[12px] font-mono">
           <div className="rounded-lg bg-zinc-800/40 border border-zinc-700/20 px-3.5 py-2.5">
@@ -553,7 +553,7 @@ function ShowDontTell() {
     {
       n: "02",
       title: "It selects the right tools automatically",
-      body: "Based on your description, the creator selects from 17+ tool sets — memory, web search, pages, email, Slack, Notion, Google, and more.",
+      body: "Based on your description, the creator selects from 17+ tool sets: memory, web search, pages, email, Slack, Notion, Google, and more.",
       visual: (
         <div className="flex flex-wrap gap-2 text-[11px] font-mono">
           {["memory", "web_search", "pages", "slack", "schedules"].map((t) => (
@@ -691,7 +691,7 @@ function ToolTape() {
             }`}
             style={{ transitionDelay: "140ms" }}
           >
-            A complete toolkit for autonomous AI — no assembly required.
+            A complete toolkit for autonomous AI. No assembly required.
           </p>
         </div>
 
