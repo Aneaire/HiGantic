@@ -85,6 +85,11 @@ function LogoModelInner() {
   const currentRef = useRef({ x: 0, y: 0 });
   const activeRef = useRef(false);
   const visible = useContext(VisibilityContext);
+  const { viewport } = useThree();
+
+  // Responsive scale and position based on viewport width
+  const responsiveScale = viewport.width < 8 ? 1.6 : viewport.width < 12 ? 2.0 : 2.6;
+  const responsiveX = viewport.width < 8 ? 1.5 : viewport.width < 12 ? 2.2 : 3.2;
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -140,7 +145,7 @@ function LogoModelInner() {
   });
 
   return (
-    <group ref={groupRef} scale={2.6} position={[3.2, 0.2, 0]}>
+    <group ref={groupRef} scale={responsiveScale} position={[responsiveX, 0.2, 0]}>
       <primitive object={scene} />
     </group>
   );
