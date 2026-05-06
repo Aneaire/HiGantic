@@ -2475,6 +2475,140 @@ export const listSandboxCredentialLinks = internalQuery({
   },
 });
 
+/**
+ * E2E test for time tracking:
+ * 1. Lists seeded time entries via server API
+ * 2. Starts a new timer via server API
+ * 3. Verifies running timer exists
+ * 4. Stops the timer
+ * 5. Logs a manual entry
+ * 6. Gets time summary
+ * 7. Deletes the manual entry
+ *
+ * Run: npx convex run seed:testTimeTracking '{}'
+ */
+export const testTimeTracking = internalAction({
+  args: {},
+  handler: async (ctx): Promise<any> => {
+    const serverToken = process.env.AGENT_SERVER_TOKEN;
+    if (!serverToken) throw new Error("AGENT_SERVER_TOKEN env var is required.");
+
+    const agent = await ctx.runQuery(internal.seed.getSandboxAgentInternal, {});
+    if (!agent) throw new Error("Sandbox agent not found. Run seed:run first.");
+
+    const tabs = await ctx.runQuery(internal.seed.getSandboxTabs, { agentId: agent._id });
+    const ttTab = tabs.find((t: any) => t.type === "time_tracking");
+    if (!ttTab) throw new Error("No time_tracking tab found. Run seed:run first.");
+
+    const results: Record<string, any> = {};
+
+    // 1. List seeded entries
+    const entries: any = await ctx.runQuery(api.agentApi.listTimeEntries, {
+      serverToken,
+      agentId: agent._id,
+      tabId: ttTab._id,
+      limit: 10,
+    });
+    results.listEntries = {
+      pass: Array.isArray(entries) && entries.length >= 4,
+      count: entries?.length ?? 0,
+    };
+
+    // 2. Check for running timer (one should exist from seed)
+    const running: any = await ctx.runQuery(api.agentApi.getRunningTimer, {
+      serverToken,
+      agentId: agent._id,
+    });
+    results.seededRunningTimer = {
+      pass: !!running && running.isRunning === true,
+      description: running?.description ?? null,
+    };
+
+    // 3. Start a new timer (should auto-stop the seeded running one)
+    const newEntryId = await ctx.runMutation(api.agentApi.startTimeTracking, {
+      serverToken,
+      agentId: agent._id,
+      tabId: ttTab._id,
+      description: "E2E test timer",
+      tags: ["test", "e2e"],
+      billable: true,
+    });
+    results.startTimer = {
+      pass: !!newEntryId,
+      entryId: newEntryId,
+    };
+
+    // 4. Verify the new timer is running
+    const runningAfter: any = await ctx.runQuery(api.agentApi.getRunningTimer, {
+      serverToken,
+      agentId: agent._id,
+    });
+    results.runningAfterStart = {
+      pass: !!runningAfter && runningAfter.description === "E2E test timer",
+    };
+
+    // 5. Stop the timer
+    const stopResult: any = await ctx.runMutation(api.agentApi.stopTimeTracking, {
+      serverToken,
+      agentId: agent._id,
+    });
+    results.stopTimer = {
+      pass: !!stopResult && typeof stopResult.duration === "number",
+      duration: stopResult?.duration ?? null,
+    };
+
+    // 6. Verify no timer running
+    const runningAfterStop: any = await ctx.runQuery(api.agentApi.getRunningTimer, {
+      serverToken,
+      agentId: agent._id,
+    });
+    results.noRunningAfterStop = {
+      pass: runningAfterStop === null,
+    };
+
+    // 7. Log a manual entry
+    const loggedId = await ctx.runMutation(api.agentApi.logTimeEntry, {
+      serverToken,
+      agentId: agent._id,
+      tabId: ttTab._id,
+      description: "Manual test entry",
+      durationMinutes: 45,
+      tags: ["test"],
+      billable: false,
+    });
+    results.logEntry = {
+      pass: !!loggedId,
+      entryId: loggedId,
+    };
+
+    // 8. Get time summary
+    const summary: any = await ctx.runQuery(api.agentApi.getTimeSummary, {
+      serverToken,
+      agentId: agent._id,
+      tabId: ttTab._id,
+      period: "month",
+    });
+    results.summary = {
+      pass: !!summary && summary.totalSeconds > 0 && summary.entryCount > 0,
+      totalSeconds: summary?.totalSeconds ?? 0,
+      entryCount: summary?.entryCount ?? 0,
+      billableSeconds: summary?.billableSeconds ?? 0,
+      tagCount: Object.keys(summary?.byTag ?? {}).length,
+    };
+
+    // 9. Delete the manual entry
+    await ctx.runMutation(api.agentApi.deleteTimeEntry, {
+      serverToken,
+      entryId: loggedId,
+    });
+    results.deleteEntry = { pass: true };
+
+    // Overall
+    const allPassed = Object.values(results).every((r: any) => r.pass);
+    return { allPassed, results };
+  },
+});
+
 export const restoreSandboxModel = internalMutation({
   args: { model: v.optional(v.string()) },
   handler: async (ctx, args) => {

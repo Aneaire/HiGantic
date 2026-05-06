@@ -89,6 +89,19 @@ export const TOOL_SET_REGISTRY: Record<string, ToolSetDef> = {
       "User-defined HTTP API tools. Users can add custom endpoints in Settings that the agent can call. Enabled by default.",
     order: 6,
   },
+  time_tracking: {
+    key: "time_tracking",
+    label: "Time Tracking",
+    description: "Track time spent on tasks and activities with start/stop timers and manual logging",
+    category: "core",
+    enabledByDefault: false,
+    canDisable: true,
+    requiresPlan: "pro",
+    requiresCredential: false,
+    creatorDescription:
+      "Track time spent on tasks and activities. Agents can start/stop timers, log time entries, and generate summaries by day, tag, or task. Data displayed in a dedicated Time Tracking page.",
+    order: 7,
+  },
   rest_api: {
     key: "rest_api",
     label: "REST API",
@@ -100,7 +113,7 @@ export const TOOL_SET_REGISTRY: Record<string, ToolSetDef> = {
     requiresCredential: false,
     creatorDescription:
       "Expose the agent as a REST API. Users can create API endpoints that external systems call, with the agent processing requests.",
-    order: 7,
+    order: 8,
   },
   postgres: {
     key: "postgres",
@@ -113,7 +126,7 @@ export const TOOL_SET_REGISTRY: Record<string, ToolSetDef> = {
     requiresCredential: false,
     creatorDescription:
       "Connect to external PostgreSQL databases. The agent can run read-only queries.",
-    order: 8,
+    order: 9,
   },
 
   // ── Automation ────────────────────────────────────────────────────────

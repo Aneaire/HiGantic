@@ -60,7 +60,8 @@ export const create = mutation({
       v.literal("data_table"),
       v.literal("postgres"),
       v.literal("api"),
-      v.literal("workflow")
+      v.literal("workflow"),
+      v.literal("time_tracking")
     ),
     icon: v.optional(v.string()),
     config: v.optional(v.any()),
@@ -75,7 +76,7 @@ export const create = mutation({
     // Plan-gate page types
     const plan = user.plan as "free" | "pro" | "enterprise";
     const allowedFree = ["tasks", "notes", "markdown", "data_table"];
-    const allowedPro = [...allowedFree, "spreadsheet", "postgres", "api", "workflow"];
+    const allowedPro = [...allowedFree, "spreadsheet", "postgres", "api", "workflow", "time_tracking"];
     const allowed = plan === "free" ? allowedFree : allowedPro;
     if (!allowed.includes(args.type)) {
       throw new Error(
@@ -203,6 +204,12 @@ export const remove = mutation({
         .withIndex("by_tab", (q) => q.eq("tabId", args.tabId))
         .collect();
       for (const e of endpoints) await ctx.db.delete(e._id);
+    } else if (tab.type === "time_tracking") {
+      const entries = await ctx.db
+        .query("tabTimeEntries")
+        .withIndex("by_tab", (q) => q.eq("tabId", args.tabId))
+        .collect();
+      for (const e of entries) await ctx.db.delete(e._id);
     }
 
     await ctx.db.delete(args.tabId);

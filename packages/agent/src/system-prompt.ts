@@ -51,6 +51,7 @@ const INTEGRATION_PATTERNS: Record<string, RegExp> = {
   google_sheets: /\b(gsheets|google sheets?|spreadsheet)\b/i,
   gmail: /\b(gmail|inbox|check my email|send an email|reply to)\b/i,
   image_generation: /\b(generate (an? )?image|create an? image|make an? image|draw (me|a|an)|picture of|generate a picture)\b/i,
+  time_tracking: /\b(time track|track time|log time|hours|timesheet|billable|how long|time spent|timer|start tracking|stop tracking)\b/i,
 };
 
 function messageRelatesToIntegration(message: string, integration: string): boolean {
@@ -195,6 +196,11 @@ export function buildSystemPrompt(
   if (has(enabled, "timers")) {
     capabilities.push(
       "- **Timers** — set delayed actions (follow-ups, reminders, drip sequences)"
+    );
+  }
+  if (has(enabled, "time_tracking")) {
+    capabilities.push(
+      "- **Time Tracking** — start/stop timers, log time entries, view summaries by day/tag/task"
     );
   }
   if (has(enabled, "webhooks")) {
@@ -482,6 +488,22 @@ When a request involves setting up a system, building a workflow, or creating mu
 `
     : "";
 
+  // ── Time Tracking guidelines ────────────────────────────────────────
+  const timeTrackingGuidance = has(enabled, "time_tracking") && shouldIncludeGuide("time_tracking")
+    ? `
+## Time Tracking
+- Use \`start_time_tracking\` to begin tracking time on an activity. Always provide a clear description.
+- Use \`stop_time_tracking\` to stop the currently running timer.
+- Use \`log_time\` to manually log completed time (e.g. "spent 2 hours on design review").
+- Use \`list_time_entries\` to view recent time entries.
+- Use \`get_time_summary\` to get totals grouped by tag for a period (today, week, month).
+- Use \`delete_time_entry\` to remove an entry.
+- Only one timer can run at a time. Starting a new timer automatically stops the previous one.
+- When the user asks "how long did I spend on X", use get_time_summary or list_time_entries to answer.
+- Support tags for categorization (e.g. "engineering", "meetings", "client work") and billable flags for invoicing.
+`
+    : "";
+
   // ── Error recovery strategy ──────────────────────────────────────────
   const errorRecoverySection = `
 ## When Things Go Wrong
@@ -539,7 +561,7 @@ When recommending, explain the *synergy* — why this addition matters given wha
 `
     : "";
 
-  return `${agentConfig.systemPrompt}${conversationHistory}${memorySection}${tabSection}${knowledgeBaseSection}${customToolSection}${schedulesSection}${automationsSection}${capabilitiesSection}${personaFramework}${cognitiveFramework}${autonomySection}${errorRecoverySection}${scheduleGuidance}${automationGuidance}${agentMessageGuidance}${notionGuidance}${slackGuidance}${discordGuidance}${gcalGuidance}${gdriveGuidance}${gsheetsGuidance}${gmailGuidance}${imageGenGuidance}${customToolGuidance}${selfAssessmentSection}
+  return `${agentConfig.systemPrompt}${conversationHistory}${memorySection}${tabSection}${knowledgeBaseSection}${customToolSection}${schedulesSection}${automationsSection}${capabilitiesSection}${personaFramework}${cognitiveFramework}${autonomySection}${errorRecoverySection}${scheduleGuidance}${automationGuidance}${agentMessageGuidance}${notionGuidance}${slackGuidance}${discordGuidance}${gcalGuidance}${gdriveGuidance}${gsheetsGuidance}${gmailGuidance}${imageGenGuidance}${timeTrackingGuidance}${customToolGuidance}${selfAssessmentSection}
 ## Interactive Questions
 When the user needs to choose between options, or when a request is ambiguous and you need clarification, use the \`ask_questions\` tool INSTEAD of writing numbered questions in plain text. This renders clickable option cards the user can select from. Do NOT duplicate the questions in your text — the tool handles display.
 

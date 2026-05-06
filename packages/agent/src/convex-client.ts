@@ -690,6 +690,81 @@ export class AgentConvexClient {
     });
   }
 
+  // ── Time Tracking ─────────────────────────────────────────────────
+
+  async listTimeEntries(agentId: string, tabId?: string, limit?: number) {
+    return this.client.query(api.agentApi.listTimeEntries, {
+      serverToken: this.serverToken,
+      agentId: agentId as any,
+      tabId: tabId as any,
+      limit,
+    });
+  }
+
+  async getRunningTimer(agentId: string) {
+    return this.client.query(api.agentApi.getRunningTimer, {
+      serverToken: this.serverToken,
+      agentId: agentId as any,
+    });
+  }
+
+  async startTimeTracking(agentId: string, tabId: string, data: {
+    description: string;
+    tags?: string[];
+    taskId?: string;
+    billable?: boolean;
+  }) {
+    return this.client.mutation(api.agentApi.startTimeTracking, {
+      serverToken: this.serverToken,
+      agentId: agentId as any,
+      tabId: tabId as any,
+      description: data.description,
+      tags: data.tags,
+      taskId: data.taskId as any,
+      billable: data.billable,
+    });
+  }
+
+  async stopTimeTracking(agentId: string) {
+    return this.client.mutation(api.agentApi.stopTimeTracking, {
+      serverToken: this.serverToken,
+      agentId: agentId as any,
+    });
+  }
+
+  async logTimeEntry(agentId: string, tabId: string, data: {
+    description: string;
+    durationMinutes: number;
+    startTime?: number;
+    tags?: string[];
+    taskId?: string;
+    billable?: boolean;
+  }) {
+    return this.client.mutation(api.agentApi.logTimeEntry, {
+      serverToken: this.serverToken,
+      agentId: agentId as any,
+      tabId: tabId as any,
+      ...data,
+      taskId: data.taskId as any,
+    });
+  }
+
+  async deleteTimeEntry(entryId: string) {
+    return this.client.mutation(api.agentApi.deleteTimeEntry, {
+      serverToken: this.serverToken,
+      entryId: entryId as any,
+    });
+  }
+
+  async getTimeSummary(agentId: string, tabId?: string, period?: string) {
+    return this.client.query(api.agentApi.getTimeSummary, {
+      serverToken: this.serverToken,
+      agentId: agentId as any,
+      tabId: tabId as any,
+      period,
+    });
+  }
+
   // ── Events ────────────────────────────────────────────────────────
 
   async emitEvent(agentId: string, event: string, source: string, payload: any) {

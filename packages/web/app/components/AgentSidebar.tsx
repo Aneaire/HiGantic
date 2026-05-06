@@ -24,6 +24,7 @@ import {
   Hash,
   ChevronDown,
   ChevronRight,
+  Clock,
 } from "lucide-react";
 import { useState, useRef, useMemo } from "react";
 import type { Doc } from "@agent-maker/shared/convex/_generated/dataModel";
@@ -37,6 +38,7 @@ const TAB_ICONS: Record<string, React.ReactNode> = {
   postgres: <Database className="h-3.5 w-3.5" strokeWidth={1.5} />,
   api: <Globe className="h-3.5 w-3.5" strokeWidth={1.5} />,
   workflow: <GitBranch className="h-3.5 w-3.5" strokeWidth={1.5} />,
+  time_tracking: <Clock className="h-3.5 w-3.5" strokeWidth={1.5} />,
 };
 
 const PAGE_TYPES = [
@@ -45,6 +47,7 @@ const PAGE_TYPES = [
   { type: "spreadsheet" as const, label: "Spreadsheet", description: "Data table", icon: Table },
   { type: "api" as const, label: "REST API", description: "Expose agent as API", icon: Globe },
   { type: "workflow" as const, label: "Workflow", description: "Automations & schedules", icon: GitBranch },
+  { type: "time_tracking" as const, label: "Time Tracking", description: "Track time on tasks", icon: Clock },
 ];
 
 const SINGLETON_PAGE_TYPES = new Set(["workflow", "api"]);

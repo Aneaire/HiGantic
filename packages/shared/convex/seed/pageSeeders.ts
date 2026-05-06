@@ -284,3 +284,54 @@ export async function seedApiEndpoints({ ctx, agentId, tabId }: PageSeedContext)
   }
   return { endpointIds: ids };
 }
+
+// ── Time Tracking Seeder ────────────────────────────────────────────────
+
+export async function seedTimeTracking({ ctx, agentId, tabId }: PageSeedContext) {
+  const now = Date.now();
+  const entries = [
+    {
+      description: "Sprint planning meeting",
+      startTime: now - 86400000 - 7200000,
+      endTime: now - 86400000 - 3600000,
+      duration: 3600,
+      isRunning: false,
+      tags: ["meetings", "planning"],
+      billable: true,
+    },
+    {
+      description: "Code review — auth module",
+      startTime: now - 86400000,
+      endTime: now - 86400000 + 2700000,
+      duration: 2700,
+      isRunning: false,
+      tags: ["engineering", "review"],
+      billable: true,
+    },
+    {
+      description: "Bug fix: login redirect loop",
+      startTime: now - 7200000,
+      endTime: now - 3600000,
+      duration: 3600,
+      isRunning: false,
+      tags: ["engineering", "bugfix"],
+      billable: true,
+    },
+    {
+      description: "Documentation update",
+      startTime: now - 1800000,
+      endTime: undefined,
+      duration: undefined,
+      isRunning: true,
+      tags: ["docs"],
+      billable: false,
+    },
+  ];
+
+  const entryIds = [];
+  for (const entry of entries) {
+    const id = await ctx.db.insert("tabTimeEntries", { tabId, agentId, ...entry });
+    entryIds.push(id);
+  }
+  return { entryIds };
+}

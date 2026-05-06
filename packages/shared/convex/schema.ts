@@ -117,7 +117,8 @@ export default defineSchema({
       v.literal("data_table"),
       v.literal("postgres"),
       v.literal("api"),
-      v.literal("workflow")
+      v.literal("workflow"),
+      v.literal("time_tracking")
     ),
     config: v.optional(v.any()),
     sortOrder: v.number(),
@@ -161,6 +162,25 @@ export default defineSchema({
       searchField: "content",
       filterFields: ["tabId"],
     }),
+
+  // ── Time Entries (backing table for "time_tracking" tabs) ──────────
+
+  tabTimeEntries: defineTable({
+    tabId: v.id("sidebarTabs"),
+    agentId: v.id("agents"),
+    description: v.string(),
+    startTime: v.number(),
+    endTime: v.optional(v.number()),
+    duration: v.optional(v.number()),
+    isRunning: v.boolean(),
+    tags: v.optional(v.array(v.string())),
+    taskId: v.optional(v.id("tabTasks")),
+    billable: v.optional(v.boolean()),
+  })
+    .index("by_tab", ["tabId"])
+    .index("by_agent", ["agentId"])
+    .index("by_agent_running", ["agentId", "isRunning"])
+    .index("by_tab_startTime", ["tabId", "startTime"]),
 
   // ── Spreadsheet (backing tables for "spreadsheet" tabs) ────────────
 
@@ -746,4 +766,63 @@ export default defineSchema({
     botUserId: v.optional(v.string()),
     connectedAt: v.optional(v.number()),
   }).index("by_agent", ["agentId"]),
+
+  // ── Blog System (Admin) ───────────────────────────────────────────────
+
+  blogCategories: defineTable({
+    name: v.string(),
+    slug: v.string(),
+    description: v.optional(v.string()),
+    sortOrder: v.number(),
+    createdAt: v.number(),
+  }).index("by_slug", ["slug"]),
+
+  blogTags: defineTable({
+    name: v.string(),
+    slug: v.string(),
+    createdAt: v.number(),
+  }).index("by_slug", ["slug"]),
+
+  blogPosts: defineTable({
+    title: v.string(),
+    slug: v.string(),
+    excerpt: v.string(),
+    content: v.string(),
+    readingTimeMinutes: v.number(),
+
+    categoryId: v.optional(v.id("blogCategories")),
+    tagIds: v.optional(v.array(v.id("blogTags"))),
+
+    featuredImageStorageId: v.optional(v.id("_storage")),
+    ogImageStorageId: v.optional(v.id("_storage")),
+
+    metaTitle: v.optional(v.string()),
+    metaDescription: v.optional(v.string()),
+
+    authorName: v.string(),
+    authorEmail: v.string(),
+
+    status: v.union(
+      v.literal("draft"),
+      v.literal("published"),
+      v.literal("scheduled")
+    ),
+    publishedAt: v.optional(v.number()),
+    scheduledAt: v.optional(v.number()),
+
+    aiGenerated: v.optional(v.boolean()),
+    aiModel: v.optional(v.string()),
+    aiImageModel: v.optional(v.string()),
+
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_status", ["status"])
+    .index("by_status_published", ["status", "publishedAt"])
+    .index("by_category", ["categoryId"])
+    .searchIndex("search_title", {
+      searchField: "title",
+      filterFields: ["status"],
+    }),
 });

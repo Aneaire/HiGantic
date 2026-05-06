@@ -22,6 +22,7 @@ import { createGSheetsTools } from "./tools/gsheets-tools.js";
 import { createImageGenTools } from "./tools/image-gen-tools.js";
 import { createGmailTools } from "./tools/gmail-tools.js";
 import { createExploreCapabilitiesTools } from "./tools/explore-capabilities-tools.js";
+import { createTimeTrackingTools } from "./tools/time-tracking-tools.js";
 
 interface Tab {
   _id: string;
@@ -174,6 +175,13 @@ export function buildMcpServer(deps: McpServerDeps): { tools: Record<string, Too
   // Automations — gated by "automations"
   if (has(enabled, "automations")) {
     tools.push(...createAutomationTools(deps.convexClient, deps.agentId));
+  }
+
+  // Time Tracking — gated by "time_tracking"
+  if (has(enabled, "time_tracking")) {
+    tools.push(
+      ...createTimeTrackingTools(deps.convexClient, deps.agentId, deps.tabs)
+    );
   }
 
   // Timers / Delayed Actions — gated by "timers"

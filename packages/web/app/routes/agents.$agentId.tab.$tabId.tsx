@@ -8,6 +8,7 @@ import { SpreadsheetPage } from "~/components/pages/SpreadsheetPage";
 import { PostgresPage } from "~/components/pages/PostgresPage";
 import { ApiPage } from "~/components/pages/ApiPage";
 import { WorkflowPage } from "~/components/pages/WorkflowPage";
+import { TimeTrackingPage } from "~/components/pages/TimeTrackingPage";
 import type { Doc } from "@agent-maker/shared/convex/_generated/dataModel";
 import type { Id } from "@agent-maker/shared/convex/_generated/dataModel";
 
@@ -61,6 +62,8 @@ export default function DynamicTabPage() {
       return <ApiPage tab={tab} />;
     case "workflow":
       return <WorkflowPage tab={tab} />;
+    case "time_tracking":
+      return <TimeTrackingPage tab={tab} />;
     default:
       return (
         <div className="flex-1 flex items-center justify-center text-sm text-ink-faint">

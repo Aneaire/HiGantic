@@ -14,6 +14,7 @@ import {
   seedSpreadsheet,
   seedMarkdown,
   seedApiEndpoints,
+  seedTimeTracking,
 } from "./pageSeeders";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -72,6 +73,7 @@ export const PAGE_SEEDERS: PageSeeder[] = [
   { type: "spreadsheet", label: "Contacts", seed: seedSpreadsheet },
   { type: "markdown", label: "Documentation", seed: seedMarkdown },
   { type: "api", label: "Agent API", seed: seedApiEndpoints },
+  { type: "time_tracking", label: "Time Tracking", seed: seedTimeTracking },
   // When you add a new page type, add its seeder here ↑
 ];
 
@@ -86,6 +88,7 @@ export const CORE_TOOL_SETS: string[] = [
   "custom_http_tools",
   "image_generation",
   "agent_messages",
+  "time_tracking",
 ];
 
 /**

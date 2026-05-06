@@ -592,7 +592,8 @@ export const createPage = mutation({
       v.literal("spreadsheet"),
       v.literal("markdown"),
       v.literal("data_table"),
-      v.literal("api")
+      v.literal("api"),
+      v.literal("time_tracking")
     ),
   },
   handler: async (ctx, args) => {
@@ -610,7 +611,7 @@ export const createPage = mutation({
     if (user) {
       const plan = (user.plan ?? "free") as "free" | "pro" | "enterprise";
       const allowedFree = ["tasks", "notes", "markdown", "data_table"];
-      const allowedPro = [...allowedFree, "spreadsheet", "postgres", "api"];
+      const allowedPro = [...allowedFree, "spreadsheet", "postgres", "api", "time_tracking"];
       const allowed = plan === "free" ? allowedFree : allowedPro;
       if (!allowed.includes(args.type)) {
         throw new Error(
@@ -1791,6 +1792,221 @@ export const listSlackAuthorizedUsers = query({
     const agent = await ctx.db.get(args.agentId);
     if (!agent) throw new Error("Agent not found");
     return ((agent as any).slackAuthorizedUsers ?? []) as string[];
+  },
+});
+
+// ── Time Tracking (server-facing) ───────────────────────────────────
+
+export const listTimeEntries = query({
+  args: {
+    serverToken: v.string(),
+    agentId: v.id("agents"),
+    tabId: v.optional(v.id("sidebarTabs")),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    if (args.tabId) {
+      return await ctx.db
+        .query("tabTimeEntries")
+        .withIndex("by_tab_startTime", (q) => q.eq("tabId", args.tabId!))
+        .order("desc")
+        .take(args.limit ?? 20);
+    }
+    return await ctx.db
+      .query("tabTimeEntries")
+      .withIndex("by_agent", (q) => q.eq("agentId", args.agentId))
+      .order("desc")
+      .take(args.limit ?? 20);
+  },
+});
+
+export const getRunningTimer = query({
+  args: {
+    serverToken: v.string(),
+    agentId: v.id("agents"),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    return await ctx.db
+      .query("tabTimeEntries")
+      .withIndex("by_agent_running", (q) =>
+        q.eq("agentId", args.agentId).eq("isRunning", true)
+      )
+      .first();
+  },
+});
+
+export const startTimeTracking = mutation({
+  args: {
+    serverToken: v.string(),
+    agentId: v.id("agents"),
+    tabId: v.id("sidebarTabs"),
+    description: v.string(),
+    tags: v.optional(v.array(v.string())),
+    taskId: v.optional(v.id("tabTasks")),
+    billable: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+
+    // Stop any running timer first
+    const running = await ctx.db
+      .query("tabTimeEntries")
+      .withIndex("by_agent_running", (q) =>
+        q.eq("agentId", args.agentId).eq("isRunning", true)
+      )
+      .first();
+
+    if (running) {
+      const now = Date.now();
+      await ctx.db.patch(running._id, {
+        isRunning: false,
+        endTime: now,
+        duration: Math.round((now - running.startTime) / 1000),
+      });
+    }
+
+    return await ctx.db.insert("tabTimeEntries", {
+      tabId: args.tabId,
+      agentId: args.agentId,
+      description: args.description,
+      startTime: Date.now(),
+      isRunning: true,
+      tags: args.tags,
+      taskId: args.taskId,
+      billable: args.billable,
+    });
+  },
+});
+
+export const stopTimeTracking = mutation({
+  args: {
+    serverToken: v.string(),
+    agentId: v.id("agents"),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+
+    const running = await ctx.db
+      .query("tabTimeEntries")
+      .withIndex("by_agent_running", (q) =>
+        q.eq("agentId", args.agentId).eq("isRunning", true)
+      )
+      .first();
+
+    if (!running) throw new Error("No timer is currently running");
+
+    const now = Date.now();
+    await ctx.db.patch(running._id, {
+      isRunning: false,
+      endTime: now,
+      duration: Math.round((now - running.startTime) / 1000),
+    });
+
+    return { entryId: running._id, duration: Math.round((now - running.startTime) / 1000), description: running.description };
+  },
+});
+
+export const logTimeEntry = mutation({
+  args: {
+    serverToken: v.string(),
+    agentId: v.id("agents"),
+    tabId: v.id("sidebarTabs"),
+    description: v.string(),
+    durationMinutes: v.number(),
+    startTime: v.optional(v.number()),
+    tags: v.optional(v.array(v.string())),
+    taskId: v.optional(v.id("tabTasks")),
+    billable: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+
+    const durationSec = Math.round(args.durationMinutes * 60);
+    const start = args.startTime ?? Date.now() - durationSec * 1000;
+
+    return await ctx.db.insert("tabTimeEntries", {
+      tabId: args.tabId,
+      agentId: args.agentId,
+      description: args.description,
+      startTime: start,
+      endTime: start + durationSec * 1000,
+      duration: durationSec,
+      isRunning: false,
+      tags: args.tags,
+      taskId: args.taskId,
+      billable: args.billable,
+    });
+  },
+});
+
+export const deleteTimeEntry = mutation({
+  args: {
+    serverToken: v.string(),
+    entryId: v.id("tabTimeEntries"),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+    await ctx.db.delete(args.entryId);
+  },
+});
+
+export const getTimeSummary = query({
+  args: {
+    serverToken: v.string(),
+    agentId: v.id("agents"),
+    tabId: v.optional(v.id("sidebarTabs")),
+    period: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    await requireServerAuth(ctx, args.serverToken);
+
+    const now = Date.now();
+    const period = args.period ?? "today";
+    let since: number;
+    if (period === "today") {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      since = d.getTime();
+    } else if (period === "week") {
+      since = now - 7 * 24 * 60 * 60 * 1000;
+    } else {
+      since = now - 30 * 24 * 60 * 60 * 1000;
+    }
+
+    let entries;
+    if (args.tabId) {
+      entries = await ctx.db
+        .query("tabTimeEntries")
+        .withIndex("by_tab_startTime", (q) =>
+          q.eq("tabId", args.tabId!).gte("startTime", since)
+        )
+        .collect();
+    } else {
+      entries = (await ctx.db
+        .query("tabTimeEntries")
+        .withIndex("by_agent", (q) => q.eq("agentId", args.agentId))
+        .collect()
+      ).filter((e) => e.startTime >= since);
+    }
+
+    let totalSeconds = 0;
+    let billableSeconds = 0;
+    const byTag: Record<string, number> = {};
+
+    for (const e of entries) {
+      const dur = e.duration ?? (e.isRunning ? Math.round((now - e.startTime) / 1000) : 0);
+      totalSeconds += dur;
+      if (e.billable) billableSeconds += dur;
+      if (e.tags) {
+        for (const tag of e.tags) {
+          byTag[tag] = (byTag[tag] ?? 0) + dur;
+        }
+      }
+    }
+
+    return { period, totalSeconds, billableSeconds, entryCount: entries.length, byTag };
   },
 });
 

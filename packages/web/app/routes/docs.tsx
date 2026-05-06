@@ -96,6 +96,11 @@ const SECTIONS: DocSection[] = [
         content: <PostgresContent />,
       },
       {
+        id: "time-tracking",
+        title: "Time Tracking",
+        content: <TimeTrackingContent />,
+      },
+      {
         id: "assets",
         title: "Asset Management",
         content: <AssetsContent />,
@@ -1023,6 +1028,106 @@ function TimersContent() {
         ["Active timers per agent", "50"],
         ["Maximum delay", "30 days"],
         ["Poll interval", "5 seconds"],
+      ]} />
+    </div>
+  );
+}
+
+function TimeTrackingContent() {
+  return (
+    <div>
+      <DocH1>Time Tracking</DocH1>
+      <div className="flex gap-2 mb-4">
+        <DocBadge>Tool set: time_tracking</DocBadge>
+        <DocBadge>Plan: Pro</DocBadge>
+        <DocBadge>Default: Disabled</DocBadge>
+      </div>
+      <DocP>
+        Track time spent on tasks and activities with start/stop timers, manual logging, and summaries. A native feature — no external service required. Just tell your agent what you're working on.
+      </DocP>
+
+      <DocH2>Tools</DocH2>
+      <DocTable headers={["Tool", "Description"]} rows={[
+        ["start_time_tracking", "Start a timer on an activity (auto-stops any running timer)"],
+        ["stop_time_tracking", "Stop the currently running timer"],
+        ["log_time", "Manually log a completed time entry"],
+        ["list_time_entries", "List recent time entries with durations"],
+        ["get_time_summary", "Get totals by tag for a period (today / week / month)"],
+        ["delete_time_entry", "Remove a time entry"],
+      ]} />
+
+      <DocH2>Use Cases</DocH2>
+
+      <DocH3>Freelancers & Billing</DocH3>
+      <DocP>
+        <strong className="text-ink">User:</strong> "Start tracking time on client meeting with Acme Corp, billable"
+      </DocP>
+      <DocP>
+        <strong className="text-ink">Agent:</strong> Starts a timer tagged as billable. When you say "done with the meeting", the agent stops the timer and logs the duration.
+      </DocP>
+      <DocP>
+        <strong className="text-ink">User:</strong> "How many billable hours this week?"
+      </DocP>
+      <DocP>
+        <strong className="text-ink">Agent:</strong> Uses get_time_summary to calculate billable totals for the week.
+      </DocP>
+
+      <DocH3>Developer Workflows</DocH3>
+      <DocP>
+        <strong className="text-ink">User:</strong> "Track time on code review for the auth module"
+      </DocP>
+      <DocP>
+        The agent starts a timer with tags like "engineering" and "review". Link to a specific task for per-task time reporting.
+      </DocP>
+      <DocP>
+        <strong className="text-ink">User:</strong> "I spent 3 hours debugging the login issue yesterday, log that"
+      </DocP>
+      <DocP>
+        <strong className="text-ink">Agent:</strong> Manually logs a 3-hour entry with a past start time.
+      </DocP>
+
+      <DocH3>Productivity Analysis</DocH3>
+      <DocP>
+        <strong className="text-ink">User:</strong> "How much time am I spending on meetings vs. deep work this week?"
+      </DocP>
+      <DocP>
+        The agent pulls summaries grouped by tag and gives you a breakdown. Use tags like "meetings", "coding", "review", "admin" to categorize your work.
+      </DocP>
+
+      <DocH2>Automation Combos</DocH2>
+      <DocP>
+        Combine with <AppLink to="/docs/tools/schedules">Scheduled Actions</AppLink> for recurring reports:
+      </DocP>
+      <DocP>
+        "Every Friday at 5pm, email me a weekly timesheet summary."
+      </DocP>
+      <DocP>
+        Combine with <AppLink to="/docs/tools/automations">Automations</AppLink> for event-driven workflows:
+      </DocP>
+      <DocP>
+        "When a timer stops and duration {">"} 4 hours, create a note summarizing what was accomplished."
+      </DocP>
+
+      <DocH2>Page UI</DocH2>
+      <DocP>
+        The Time Tracking page shows a live timer banner, start/stop controls, a manual entry form, and all entries grouped by day with duration totals. Summary stats for today and this week appear in the header.
+      </DocP>
+
+      <DocH2>Events</DocH2>
+      <DocTable headers={["Event", "Description"]} rows={[
+        ["time_tracking.started", "A timer was started"],
+        ["time_tracking.stopped", "A timer was stopped"],
+        ["time_tracking.logged", "A time entry was manually logged"],
+        ["time_tracking.deleted", "A time entry was deleted"],
+      ]} />
+
+      <DocH2>Key Details</DocH2>
+      <DocTable headers={["Detail", "Value"]} rows={[
+        ["Running timers per agent", "1 (starting a new one auto-stops the previous)"],
+        ["Tags", "Unlimited, comma-separated"],
+        ["Billable flag", "Per-entry, used in summaries"],
+        ["Task linking", "Optional — link entries to tasks for per-task reporting"],
+        ["Auto-create page", "Agent creates the page automatically on first use"],
       ]} />
     </div>
   );

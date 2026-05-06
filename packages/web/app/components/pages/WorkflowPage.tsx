@@ -1098,6 +1098,16 @@ const EVENT_OPTIONS: Array<{
       { value: "agent_message.received", description: "This agent received a message from another agent" },
     ],
   },
+  {
+    group: "Time Tracking",
+    groupColor: "text-teal-400",
+    events: [
+      { value: "time_tracking.started", description: "A timer was started" },
+      { value: "time_tracking.stopped", description: "A timer was stopped" },
+      { value: "time_tracking.logged",  description: "A time entry was manually logged" },
+      { value: "time_tracking.deleted", description: "A time entry was deleted" },
+    ],
+  },
 ];
 
 function EventPicker({
@@ -1515,6 +1525,13 @@ const PAYLOAD_VARIABLES: Record<string, Array<{ key: string; description: string
     { key: "{{event.documentId}}", description: "Document ID" },
     { key: "{{event.fileName}}",   description: "File name" },
     { key: "{{event.chunkCount}}", description: "Number of chunks indexed" },
+  ],
+  "time_tracking.*": [
+    { key: "{{event.entryId}}",     description: "Time entry ID" },
+    { key: "{{event.description}}", description: "What was being tracked" },
+    { key: "{{event.duration}}",    description: "Duration in seconds" },
+    { key: "{{event.tags}}",        description: "Tags array" },
+    { key: "{{event.billable}}",    description: "Whether billable" },
   ],
 };
 
