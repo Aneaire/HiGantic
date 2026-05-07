@@ -23,6 +23,7 @@ import type * as automations from "../automations.js";
 import type * as blogCategories from "../blogCategories.js";
 import type * as blogGeneration from "../blogGeneration.js";
 import type * as blogPosts from "../blogPosts.js";
+import type * as blogSeed from "../blogSeed.js";
 import type * as blogTags from "../blogTags.js";
 import type * as conversations from "../conversations.js";
 import type * as creatorApi from "../creatorApi.js";
@@ -81,6 +82,7 @@ declare const fullApi: ApiFromModules<{
   blogCategories: typeof blogCategories;
   blogGeneration: typeof blogGeneration;
   blogPosts: typeof blogPosts;
+  blogSeed: typeof blogSeed;
   blogTags: typeof blogTags;
   conversations: typeof conversations;
   creatorApi: typeof creatorApi;

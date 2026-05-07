@@ -1,0 +1,23 @@
+{
+  "skill_name": "blog-generator",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Write a draft HiGantic blog post about using AI agents to triage inbound support emails. Include SEO fields and tags, but do not publish it.",
+      "expected_output": "A JSON-compatible blog post package with title, slug, excerpt under 300 characters, markdown content without an H1, SEO metadata, and suggested tags.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Add a sample seeded blog post to this repo about event-driven automations in HiGantic. Keep it scoped to the Convex blog seed flow.",
+      "expected_output": "A scoped repository edit using the existing blog seed pattern, preserving schema fields and computing reading time consistently.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Create a publish-ready article page entry for a tutorial on building a weekly research agent. Include image prompt guidance and verification steps.",
+      "expected_output": "A complete post package plus practical repository-aware instructions for images, admin entry, and blog route verification.",
+      "files": []
+    }
+  ]
+}

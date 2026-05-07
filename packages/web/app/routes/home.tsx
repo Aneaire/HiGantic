@@ -147,6 +147,7 @@ function LandingNav() {
           <a href="#how" className="hover:text-zinc-200 transition-colors nav-underline">How it works</a>
           <a href="#tools" className="hover:text-zinc-200 transition-colors nav-underline">Tools</a>
           <a href="#pricing" className="hover:text-zinc-200 transition-colors nav-underline">Pricing</a>
+          <Link to="/blog" className="hover:text-zinc-200 transition-colors nav-underline">Blog</Link>
           <Link to="/docs" className="hover:text-zinc-200 transition-colors nav-underline">Docs</Link>
         </div>
 
@@ -936,6 +937,7 @@ function Footer() {
 
           <div className="flex items-center gap-6 text-[13px] text-zinc-600">
             <Link to="/docs" className="hover:text-zinc-300 transition-colors">Docs</Link>
+            <Link to="/blog" className="hover:text-zinc-300 transition-colors">Blog</Link>
             <a href="#pricing" className="hover:text-zinc-300 transition-colors">Pricing</a>
             <a href="#" className="hover:text-zinc-300 transition-colors">Privacy</a>
             <a href="#" className="hover:text-zinc-300 transition-colors">Terms</a>
@@ -945,4 +947,3 @@ function Footer() {
     </footer>
   );
 }
-
