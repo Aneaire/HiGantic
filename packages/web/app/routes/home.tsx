@@ -31,7 +31,7 @@ const DashboardView = lazy(() => import("~/components/DashboardView"));
 
 export function meta(_args: Route.MetaArgs) {
   return [
-    { title: "HiGantic - AI Agents That Think, Remember, and Act" },
+    { title: "HiGantic" },
     {
       name: "description",
       content:
